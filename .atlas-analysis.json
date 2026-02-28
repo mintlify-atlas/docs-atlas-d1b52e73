@@ -1,0 +1,153 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "SuprSend Python SDK",
+  "projectDescription": "Python SDK for integrating SuprSend's multi-channel notification platform into your application",
+  "theme": "palm",
+  "primaryColor": "#6366F1",
+  "lightColor": "#818CF8",
+  "darkColor": "#4F46E5",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "core-concepts/workflows",
+              "core-concepts/users",
+              "core-concepts/events",
+              "core-concepts/channels"
+            ]
+          },
+          {
+            "group": "User Management",
+            "pages": [
+              "users/managing-users",
+              "users/user-properties",
+              "users/channel-management",
+              "users/bulk-operations"
+            ]
+          },
+          {
+            "group": "Workflows",
+            "pages": [
+              "workflows/triggering-workflows",
+              "workflows/workflow-data",
+              "workflows/attachments",
+              "workflows/bulk-workflows"
+            ]
+          },
+          {
+            "group": "Events",
+            "pages": [
+              "events/tracking-events",
+              "events/event-properties",
+              "events/bulk-events"
+            ]
+          },
+          {
+            "group": "Advanced Features",
+            "pages": [
+              "advanced/tenants",
+              "advanced/brands",
+              "advanced/subscriber-lists",
+              "advanced/idempotency"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/error-handling",
+              "guides/size-limits",
+              "guides/best-practices"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Client",
+            "pages": [
+              "api-reference/suprsend"
+            ]
+          },
+          {
+            "group": "Workflows",
+            "pages": [
+              "api-reference/workflow-trigger-request",
+              "api-reference/workflows-api",
+              "api-reference/bulk-workflows"
+            ]
+          },
+          {
+            "group": "Users",
+            "pages": [
+              "api-reference/subscriber",
+              "api-reference/users-api",
+              "api-reference/bulk-users"
+            ]
+          },
+          {
+            "group": "Events",
+            "pages": [
+              "api-reference/event",
+              "api-reference/bulk-events"
+            ]
+          },
+          {
+            "group": "Multi-tenancy",
+            "pages": [
+              "api-reference/tenants",
+              "api-reference/brands"
+            ]
+          },
+          {
+            "group": "Subscriber Lists",
+            "pages": [
+              "api-reference/subscriber-lists",
+              "api-reference/subscriber-list-broadcast"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Trigger multi-channel notification workflows",
+    "Manage user profiles and communication channels",
+    "Track custom events for user engagement",
+    "Bulk operations for workflows, users, and events",
+    "Multi-tenancy support with tenants and brands",
+    "Subscriber list broadcasting",
+    "File attachments for notifications",
+    "Idempotency for reliable delivery"
+  ],
+  "publicApiSurface": [
+    "Suprsend",
+    "WorkflowTriggerRequest",
+    "Workflow",
+    "Event",
+    "Subscriber",
+    "SubscriberListBroadcast",
+    "BulkResponse",
+    "ObjectEdit",
+    "UserEdit",
+    "BulkUsersEdit",
+    "SuprsendError",
+    "SuprsendConfigError",
+    "SuprsendAPIException",
+    "SuprsendValidationError",
+    "InputValueError"
+  ]
+}
