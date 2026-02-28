@@ -1,0 +1,248 @@
+---
+title: File Attachments
+description: Learn how to add file attachments to your workflows
+---
+
+## Overview
+
+You can attach files to workflows (such as email notifications) using the `add_attachment()` method. The SDK automatically handles file reading, MIME type detection, and base64 encoding.
+
+## Basic Usage
+
+Add attachments to a workflow by calling `add_attachment()` with a file path:
+
+```python
+from suprsend import Suprsend, WorkflowTriggerRequest
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+workflow_body = {
+    "workflow": "invoice-notification",
+    "recipients": [{"distinct_id": "user_123"}],
+    "data": {"invoice_number": "INV-001"}
+}
+
+wf = WorkflowTriggerRequest(body=workflow_body)
+
+# Add attachment
+file_path = "/home/user/billing.pdf"
+wf.add_attachment(file_path)
+
+# Trigger workflow
+response = supr_client.workflows.trigger(wf)
+```
+
+## add_attachment() Method
+
+The `add_attachment()` method accepts the following parameters:
+
+<ParamField path="file_path" type="str" required>
+  Path to the file to attach. Can be an absolute or relative path.
+</ParamField>
+
+<ParamField path="file_name" type="str">
+  Custom name for the attachment. If not provided, the original filename is used.
+</ParamField>
+
+<ParamField path="ignore_if_error" type="bool" default="False">
+  If True, silently ignore errors (e.g., file not found) instead of raising an exception.
+</ParamField>
+
+## Multiple Attachments
+
+You can add multiple attachments by calling `add_attachment()` multiple times:
+
+```python
+from suprsend import WorkflowTriggerRequest
+
+workflow_body = {
+    "workflow": "report-delivery",
+    "recipients": [{"distinct_id": "user_123"}],
+    "data": {"report_month": "January"}
+}
+
+wf = WorkflowTriggerRequest(body=workflow_body)
+
+# Add multiple attachments
+wf.add_attachment("/home/user/report.pdf")
+wf.add_attachment("/home/user/summary.xlsx")
+wf.add_attachment("/home/user/chart.png")
+
+response = supr_client.workflows.trigger(wf)
+```
+
+## Custom Filename
+
+You can specify a custom filename for the attachment:
+
+```python
+wf = WorkflowTriggerRequest(body=workflow_body)
+
+# Original file: invoice_2024_01_15.pdf
+# Attachment name: Invoice.pdf
+wf.add_attachment(
+    "/home/user/invoice_2024_01_15.pdf",
+    file_name="Invoice.pdf"
+)
+```
+
+## Error Handling
+
+### Raising Errors (Default)
+
+By default, the method raises a `FileNotFoundError` if the file doesn't exist:
+
+```python
+wf = WorkflowTriggerRequest(body=workflow_body)
+
+try:
+    wf.add_attachment("/path/to/nonexistent/file.pdf")
+except FileNotFoundError as e:
+    print(f"File not found: {e}")
+```
+
+### Ignoring Errors
+
+You can silently ignore errors using the `ignore_if_error` parameter:
+
+```python
+wf = WorkflowTriggerRequest(body=workflow_body)
+
+# Won't raise an error if file doesn't exist
+wf.add_attachment(
+    "/path/to/optional/file.pdf",
+    ignore_if_error=True
+)
+```
+
+## Attachment Structure
+
+The `add_attachment()` method appends the following structure to `body->data->$attachments`:
+
+```json
+{
+    "filename": "billing.pdf",
+    "contentType": "application/pdf",
+    "data": "Q29uZ3JhdHVsYXRpb25zLCB5b3UgY2FuIGJhc2U2NCBkZWNvZGUh"
+}
+```
+
+### Fields
+
+<ResponseField name="filename" type="string">
+  Name of the file
+</ResponseField>
+
+<ResponseField name="contentType" type="string">
+  MIME type of the file content (e.g., `application/pdf`, `image/png`)
+</ResponseField>
+
+<ResponseField name="data" type="string">
+  Base64-encoded content of the file
+</ResponseField>
+
+## MIME Type Detection
+
+### Default Detection
+
+By default, the SDK uses Python's built-in `mimetypes` module, which guesses MIME types based on file extensions.
+
+### Enhanced Detection
+
+For more accurate MIME type detection based on actual file content, install the SDK with the `magic` extra:
+
+```bash
+pip install suprsend-py-sdk[magic]
+```
+
+This requires the `libmagic` system library:
+
+<CodeGroup>
+```bash Debian/Ubuntu
+sudo apt install libmagic1
+```
+
+```bash macOS
+brew install libmagic
+```
+</CodeGroup>
+
+## Complete Example
+
+Here's a complete example with multiple attachments:
+
+```python
+from suprsend import Suprsend, WorkflowTriggerRequest
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+workflow_body = {
+    "workflow": "monthly-report",
+    "recipients": [
+        {
+            "distinct_id": "manager_123",
+            "$email": ["manager@example.com"]
+        }
+    ],
+    "data": {
+        "recipient_name": "John Manager",
+        "report_month": "January 2024",
+        "summary": "Q4 performance exceeded expectations"
+    }
+}
+
+wf = WorkflowTriggerRequest(
+    body=workflow_body,
+    idempotency_key="monthly_report_2024_01"
+)
+
+# Add multiple attachments
+wf.add_attachment("/reports/q4_2024.pdf", file_name="Q4 Report.pdf")
+wf.add_attachment("/reports/analytics.xlsx", file_name="Analytics.xlsx")
+wf.add_attachment("/reports/chart.png", file_name="Performance Chart.png")
+
+# Optional attachment - won't fail if missing
+wf.add_attachment(
+    "/reports/optional_notes.txt",
+    file_name="Notes.txt",
+    ignore_if_error=True
+)
+
+response = supr_client.workflows.trigger(wf)
+print(response)
+```
+
+## Limitations
+
+<Warning>
+**Size Constraints**
+
+The total workflow body size (including attachments) must not exceed 800KB (800 * 1024 bytes). The SDK will raise a `ValueError` if this limit is exceeded.
+</Warning>
+
+<Warning>
+**Bulk API Restrictions**
+
+By default, attachments are not allowed in bulk workflow API calls. They are automatically removed from workflow bodies when using bulk operations.
+</Warning>
+
+## Best Practices
+
+<Check>
+- Keep attachments small to stay within the 800KB limit
+- Use descriptive filenames for better user experience
+- Install the `magic` extra for accurate MIME type detection
+- Use `ignore_if_error=True` for optional attachments
+- Consider using cloud storage URLs in the data object for large files instead of direct attachments
+</Check>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Workflow Data" icon="database" href="/workflows/workflow-data">
+    Learn about structuring workflow data and recipients
+  </Card>
+  <Card title="Bulk Workflows" icon="layer-group" href="/workflows/bulk-workflows">
+    Trigger multiple workflows in a single request
+  </Card>
+</CardGroup>

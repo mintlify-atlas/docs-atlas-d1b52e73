@@ -1,0 +1,418 @@
+---
+title: 'SubscriberListsApi'
+description: 'API for managing subscriber lists and performing operations on list members'
+---
+
+## Overview
+
+The `SubscriberListsApi` class provides methods to create, retrieve, update, and delete subscriber lists, as well as manage subscribers within those lists. You can also broadcast messages to subscriber lists and perform version-based sync operations.
+
+## Initialization
+
+The `SubscriberListsApi` is initialized with a configuration object:
+
+```python
+from suprsend import Suprsend
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+subscriber_lists = supr_client.subscriber_lists
+```
+
+## Methods
+
+### create
+
+Create a new subscriber list.
+
+```python
+create(payload: Dict) -> Dict
+```
+
+**Parameters:**
+- `payload` (Dict): Dictionary containing list details. Must include `list_id`.
+
+**Returns:**
+- Dict: Response from the API
+
+**Example:**
+```python
+response = subscriber_lists.create({
+    "list_id": "weekly_newsletter",
+    "list_name": "Weekly Newsletter Subscribers",
+    "list_description": "Users subscribed to weekly newsletter"
+})
+```
+
+**Raises:**
+- `SuprsendValidationError`: If payload is missing or list_id is invalid
+- `SuprsendAPIException`: If the API request fails
+
+---
+
+### get_all
+
+Retrieve all subscriber lists with pagination.
+
+```python
+get_all(limit: int = 20, offset: int = 0) -> Dict
+```
+
+**Parameters:**
+- `limit` (int, optional): Number of lists to retrieve (1-1000). Default: 20
+- `offset` (int, optional): Number of lists to skip. Default: 0
+
+**Returns:**
+- Dict: Response containing list of subscriber lists
+
+**Example:**
+```python
+response = subscriber_lists.get_all(limit=50, offset=0)
+```
+
+**Raises:**
+- `SuprsendAPIException`: If the API request fails
+
+---
+
+### get
+
+Retrieve details of a specific subscriber list.
+
+```python
+get(list_id: str) -> Dict
+```
+
+**Parameters:**
+- `list_id` (str): Unique identifier for the subscriber list
+
+**Returns:**
+- Dict: Subscriber list details
+
+**Example:**
+```python
+response = subscriber_lists.get("weekly_newsletter")
+```
+
+**Raises:**
+- `SuprsendValidationError`: If list_id is invalid
+- `SuprsendAPIException`: If the API request fails
+
+---
+
+### add
+
+Add subscribers to a list.
+
+```python
+add(list_id: str, distinct_ids: list) -> Dict
+```
+
+**Parameters:**
+- `list_id` (str): Unique identifier for the subscriber list
+- `distinct_ids` (list): List of distinct_ids to add to the list
+
+**Returns:**
+- Dict: Response from the API
+
+**Example:**
+```python
+response = subscriber_lists.add(
+    "weekly_newsletter",
+    ["user_123", "user_456", "user_789"]
+)
+```
+
+**Raises:**
+- `SuprsendValidationError`: If list_id or distinct_ids is invalid
+- `SuprsendAPIException`: If the API request fails
+
+---
+
+### remove
+
+Remove subscribers from a list.
+
+```python
+remove(list_id: str, distinct_ids: list) -> Dict
+```
+
+**Parameters:**
+- `list_id` (str): Unique identifier for the subscriber list
+- `distinct_ids` (list): List of distinct_ids to remove from the list
+
+**Returns:**
+- Dict: Response from the API
+
+**Example:**
+```python
+response = subscriber_lists.remove(
+    "weekly_newsletter",
+    ["user_123", "user_456"]
+)
+```
+
+**Raises:**
+- `SuprsendValidationError`: If list_id or distinct_ids is invalid
+- `SuprsendAPIException`: If the API request fails
+
+---
+
+### delete
+
+Delete a subscriber list.
+
+```python
+delete(list_id: str) -> Dict
+```
+
+**Parameters:**
+- `list_id` (str): Unique identifier for the subscriber list
+
+**Returns:**
+- Dict: Response from the API
+
+**Example:**
+```python
+response = subscriber_lists.delete("weekly_newsletter")
+```
+
+**Raises:**
+- `SuprsendValidationError`: If list_id is invalid
+- `SuprsendAPIException`: If the API request fails
+
+---
+
+### broadcast
+
+Send a broadcast message to all subscribers in a list.
+
+```python
+broadcast(broadcast_instance: SubscriberListBroadcast) -> Dict
+```
+
+**Parameters:**
+- `broadcast_instance` (SubscriberListBroadcast): Instance of SubscriberListBroadcast containing the message details
+
+**Returns:**
+- Dict: Response containing:
+  - `success` (bool): Whether the broadcast was successful
+  - `status` (str): "success" or "fail"
+  - `status_code` (int): HTTP status code
+  - `message` (str): Response message
+
+**Example:**
+```python
+from suprsend import SubscriberListBroadcast
+
+broadcast = SubscriberListBroadcast({
+    "list_id": "weekly_newsletter",
+    "template": "weekly_digest",
+    "notification_category": "transactional",
+    "data": {
+        "header": "This week's highlights",
+        "content": "Check out our latest updates"
+    }
+})
+
+response = subscriber_lists.broadcast(broadcast)
+```
+
+**Raises:**
+- `InputValueError`: If argument is not a SubscriberListBroadcast instance
+
+---
+
+## Version-based Sync Methods
+
+These methods allow you to perform sync operations on specific versions of a subscriber list.
+
+### start_sync
+
+Start a new sync operation for a subscriber list.
+
+```python
+start_sync(list_id: str) -> Dict
+```
+
+**Parameters:**
+- `list_id` (str): Unique identifier for the subscriber list
+
+**Returns:**
+- Dict: Response containing the version_id for the sync operation
+
+**Example:**
+```python
+response = subscriber_lists.start_sync("weekly_newsletter")
+version_id = response["version_id"]
+```
+
+**Raises:**
+- `SuprsendValidationError`: If list_id is invalid
+- `SuprsendAPIException`: If the API request fails
+
+---
+
+### get_version
+
+Retrieve details of a specific version of a subscriber list.
+
+```python
+get_version(list_id: str, version_id: str) -> Dict
+```
+
+**Parameters:**
+- `list_id` (str): Unique identifier for the subscriber list
+- `version_id` (str): Version identifier
+
+**Returns:**
+- Dict: Version details
+
+**Example:**
+```python
+response = subscriber_lists.get_version("weekly_newsletter", "v_123456")
+```
+
+**Raises:**
+- `SuprsendValidationError`: If list_id or version_id is invalid
+- `SuprsendAPIException`: If the API request fails
+
+---
+
+### add_to_version
+
+Add subscribers to a specific version of a list.
+
+```python
+add_to_version(list_id: str, version_id: str, distinct_ids: list) -> Dict
+```
+
+**Parameters:**
+- `list_id` (str): Unique identifier for the subscriber list
+- `version_id` (str): Version identifier
+- `distinct_ids` (list): List of distinct_ids to add
+
+**Returns:**
+- Dict: Response from the API
+
+**Example:**
+```python
+response = subscriber_lists.add_to_version(
+    "weekly_newsletter",
+    "v_123456",
+    ["user_123", "user_456"]
+)
+```
+
+**Raises:**
+- `SuprsendValidationError`: If list_id, version_id, or distinct_ids is invalid
+- `SuprsendAPIException`: If the API request fails
+
+---
+
+### remove_from_version
+
+Remove subscribers from a specific version of a list.
+
+```python
+remove_from_version(list_id: str, version_id: str, distinct_ids: list) -> Dict
+```
+
+**Parameters:**
+- `list_id` (str): Unique identifier for the subscriber list
+- `version_id` (str): Version identifier
+- `distinct_ids` (list): List of distinct_ids to remove
+
+**Returns:**
+- Dict: Response from the API
+
+**Example:**
+```python
+response = subscriber_lists.remove_from_version(
+    "weekly_newsletter",
+    "v_123456",
+    ["user_123"]
+)
+```
+
+**Raises:**
+- `SuprsendValidationError`: If list_id, version_id, or distinct_ids is invalid
+- `SuprsendAPIException`: If the API request fails
+
+---
+
+### finish_sync
+
+Complete a sync operation and make the version active.
+
+```python
+finish_sync(list_id: str, version_id: str) -> Dict
+```
+
+**Parameters:**
+- `list_id` (str): Unique identifier for the subscriber list
+- `version_id` (str): Version identifier
+
+**Returns:**
+- Dict: Response from the API
+
+**Example:**
+```python
+response = subscriber_lists.finish_sync("weekly_newsletter", "v_123456")
+```
+
+**Raises:**
+- `SuprsendValidationError`: If list_id or version_id is invalid
+- `SuprsendAPIException`: If the API request fails
+
+---
+
+### delete_version
+
+Delete a specific version of a subscriber list.
+
+```python
+delete_version(list_id: str, version_id: str) -> Dict
+```
+
+**Parameters:**
+- `list_id` (str): Unique identifier for the subscriber list
+- `version_id` (str): Version identifier
+
+**Returns:**
+- Dict: Response from the API
+
+**Example:**
+```python
+response = subscriber_lists.delete_version("weekly_newsletter", "v_123456")
+```
+
+**Raises:**
+- `SuprsendValidationError`: If list_id or version_id is invalid
+- `SuprsendAPIException`: If the API request fails
+
+---
+
+## Complete Sync Example
+
+```python
+# Start a sync operation
+sync_response = subscriber_lists.start_sync("weekly_newsletter")
+version_id = sync_response["version_id"]
+
+# Add subscribers to the new version
+subscriber_lists.add_to_version(
+    "weekly_newsletter",
+    version_id,
+    ["user_123", "user_456", "user_789"]
+)
+
+# Remove any subscribers that should no longer be in the list
+subscriber_lists.remove_from_version(
+    "weekly_newsletter",
+    version_id,
+    ["user_old_1", "user_old_2"]
+)
+
+# Finish the sync to make this version active
+subscriber_lists.finish_sync("weekly_newsletter", version_id)
+```

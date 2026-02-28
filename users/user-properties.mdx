@@ -1,0 +1,293 @@
+---
+title: 'User Properties'
+description: 'Set preferred language, timezone, locale, and custom properties for users'
+---
+
+## Overview
+
+SuprSend allows you to set various properties on user profiles to personalize notifications and improve user experience. This includes setting preferred language, timezone, locale, and custom properties.
+
+## Preferred Language
+
+Set the user's preferred language for receiving notifications. The language code must be a 2-letter code in ISO 639-1 Alpha-2 format.
+
+### Setting Preferred Language
+
+```python
+from suprsend import Suprsend
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+user = supr_client.user.get_instance("user_123")
+
+# Set preferred language (ISO 639-1 Alpha-2 code)
+user.set_preferred_language("en")  # English
+
+response = user.save()
+print(response)
+```
+
+### Common Language Codes
+
+| Language | Code |
+|----------|------|
+| English | `en` |
+| Spanish | `es` |
+| French | `fr` |
+| German | `de` |
+| Italian | `it` |
+| Portuguese | `pt` |
+| Japanese | `ja` |
+| Chinese | `zh` |
+| Hindi | `hi` |
+| Arabic | `ar` |
+
+<Note>
+Refer to [ISO 639-1 language codes](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes) for the complete list.
+</Note>
+
+## Timezone
+
+Set the user's timezone to ensure notifications are sent at the appropriate local time.
+
+### Setting Timezone
+
+```python
+# Set timezone (IANA timezone format)
+user.set_timezone("America/Los_Angeles")
+
+response = user.save()
+print(response)
+```
+
+### Common Timezones
+
+| Location | Timezone |
+|----------|----------|
+| Los Angeles | `America/Los_Angeles` |
+| New York | `America/New_York` |
+| London | `Europe/London` |
+| Paris | `Europe/Paris` |
+| Tokyo | `Asia/Tokyo` |
+| Mumbai | `Asia/Kolkata` |
+| Sydney | `Australia/Sydney` |
+| Dubai | `Asia/Dubai` |
+
+<Note>
+Timezones must be in IANA timezone format. See the [IANA timezone database](https://data.iana.org/time-zones/tzdb-2024a/zonenow.tab) for all available timezones.
+</Note>
+
+## Locale
+
+Set the user's locale for region-specific formatting of dates, numbers, and currency.
+
+### Setting Locale
+
+```python
+# Set locale
+user.set_locale("en_US")  # English (United States)
+
+response = user.save()
+print(response)
+```
+
+### Common Locales
+
+| Region | Locale |
+|--------|--------|
+| United States | `en_US` |
+| United Kingdom | `en_GB` |
+| Spain | `es_ES` |
+| France | `fr_FR` |
+| Germany | `de_DE` |
+| India | `en_IN` |
+| Japan | `ja_JP` |
+
+## Custom Properties
+
+You can set any custom properties on user profiles to store additional user information.
+
+### Setting Custom Properties
+
+```python
+# Set single property
+user.set("subscription_tier", "premium")
+user.set("account_balance", 150.50)
+user.set("is_verified", True)
+
+# Set multiple properties
+user.set({
+    "subscription_tier": "premium",
+    "account_balance": 150.50,
+    "is_verified": True,
+    "signup_date": "2024-01-15"
+})
+
+response = user.save()
+```
+
+### Property Types
+
+SuprSend supports various property types:
+
+- **String**: `"premium"`, `"active"`
+- **Number**: `150.50`, `42`
+- **Boolean**: `True`, `False`
+- **Date/Time**: `"2024-01-15"`, `"2024-01-15T10:30:00Z"`
+- **Lists**: `["tag1", "tag2"]`
+- **Nested Objects**: `{"address": {"city": "NYC"}}`
+
+## Complete Example
+
+```python
+from suprsend import Suprsend
+
+# Initialize SDK
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+# Create user instance
+user = supr_client.user.get_instance("user_123")
+
+# Set preferred language
+user.set_preferred_language("en")
+
+# Set timezone
+user.set_timezone("America/New_York")
+
+# Set locale
+user.set_locale("en_US")
+
+# Set custom properties
+user.set({
+    "first_name": "John",
+    "last_name": "Doe",
+    "subscription_tier": "premium",
+    "account_balance": 500.00,
+    "is_verified": True,
+    "tags": ["vip", "early_adopter"],
+    "preferences": {
+        "newsletter": True,
+        "marketing": False
+    }
+})
+
+# Save all changes
+response = user.save()
+
+if response["success"]:
+    print("User properties updated successfully")
+else:
+    print(f"Error: {response['message']}")
+```
+
+## Using Properties in Workflows
+
+Once properties are set on a user profile, they can be used in workflow triggers and templates:
+
+```python
+from suprsend import WorkflowTriggerRequest
+
+# Trigger workflow with user properties
+wf = WorkflowTriggerRequest(
+    body={
+        "workflow": "welcome_email",
+        "recipients": [
+            {
+                "distinct_id": "user_123"
+                # Properties are automatically loaded from user profile
+            }
+        ],
+        "data": {
+            "offer_code": "WELCOME20"
+        }
+    }
+)
+
+response = supr_client.workflows.trigger(wf)
+```
+
+## Property Operations
+
+### Set Once (Only if Not Exists)
+
+```python
+# Will only set if property doesn't exist
+user.set_once("first_purchase_date", "2024-01-15")
+user.set_once({
+    "signup_source": "mobile_app",
+    "initial_plan": "free"
+})
+```
+
+### Increment Numeric Properties
+
+```python
+# Increment counters
+user.increment("total_purchases", 1)
+user.increment("lifetime_value", 99.99)
+
+user.increment({
+    "total_purchases": 1,
+    "lifetime_value": 99.99
+})
+```
+
+### Append to List Properties
+
+```python
+# Add items to lists
+user.append("purchase_history", "product_123")
+user.append({
+    "tags": "new_tag",
+    "interests": "technology"
+})
+```
+
+### Remove from List Properties
+
+```python
+# Remove items from lists
+user.remove("tags", "old_tag")
+user.remove({
+    "tags": "deprecated",
+    "interests": "outdated"
+})
+```
+
+### Unset Properties
+
+```python
+# Delete properties
+user.unset("temporary_flag")
+user.unset(["old_field", "deprecated_property"])
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Standard Formats" icon="globe">
+    Always use ISO 639-1 for language codes and IANA format for timezones.
+  </Card>
+  <Card title="Set on Signup" icon="user-plus">
+    Set language, timezone, and locale during user registration for immediate personalization.
+  </Card>
+  <Card title="Update Regularly" icon="arrows-rotate">
+    Allow users to update their preferences and sync changes to SuprSend.
+  </Card>
+  <Card title="Property Naming" icon="tag">
+    Use consistent, descriptive names for custom properties across your application.
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Managing Users" icon="user" href="/users/managing-users">
+    Learn the basics of creating and managing users
+  </Card>
+  <Card title="Channel Management" icon="messages" href="/users/channel-management">
+    Add email, SMS, push, and other channels
+  </Card>
+  <Card title="Bulk Operations" icon="users" href="/users/bulk-operations">
+    Update properties for multiple users at once
+  </Card>
+</CardGroup>

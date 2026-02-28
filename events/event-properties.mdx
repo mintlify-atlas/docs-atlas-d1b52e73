@@ -1,0 +1,304 @@
+---
+title: "Event Properties"
+description: "Understand event properties, reserved event names, and naming conventions in SuprSend"
+---
+
+## Overview
+
+Event properties provide additional context and metadata about user actions. Understanding how to structure properties and which event names are reserved is crucial for effective event tracking.
+
+## Event Properties
+
+Properties are passed as a dictionary when creating an event:
+
+```python
+from suprsend import Event
+
+event = Event(
+    distinct_id="user_123",
+    event_name="product_purchased",
+    properties={
+        "product_id": "prod_456",
+        "product_name": "Premium Subscription",
+        "price": 99.99,
+        "currency": "USD",
+        "category": "subscription",
+        "billing_cycle": "monthly"
+    }
+)
+```
+
+### Property Types
+
+Event properties support various data types:
+
+<AccordionGroup>
+  <Accordion title="String">
+    ```python
+    properties = {
+        "product_name": "Premium Plan",
+        "category": "subscription"
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Number">
+    ```python
+    properties = {
+        "price": 99.99,
+        "quantity": 2,
+        "discount_percent": 15
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Boolean">
+    ```python
+    properties = {
+        "is_first_purchase": True,
+        "has_coupon": False
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Lists">
+    ```python
+    properties = {
+        "tags": ["premium", "annual"],
+        "features": ["analytics", "api_access", "priority_support"]
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Nested Objects">
+    ```python
+    properties = {
+        "billing_address": {
+            "city": "San Francisco",
+            "state": "CA",
+            "country": "USA",
+            "postal_code": "94105"
+        }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Reserved Event Names
+
+SuprSend reserves certain event names for system-level tracking. These events are automatically tracked by SuprSend SDKs and should not be used for custom events.
+
+### System Reserved Events
+
+<Warning>
+  Do not use these event names for custom events. They are reserved for SuprSend internal tracking.
+</Warning>
+
+| Event Name | Description |
+|------------|-------------|
+| `$identify` | User identification and profile updates |
+| `$notification_delivered` | Notification successfully delivered to user |
+| `$notification_dismiss` | User dismissed a notification |
+| `$notification_clicked` | User clicked on a notification |
+| `$app_launched` | User opened/launched the application |
+| `$user_login` | User logged into the application |
+| `$user_logout` | User logged out of the application |
+
+### Event Name Restrictions
+
+Event names with certain prefixes are reserved by SuprSend:
+
+<CodeGroup>
+```python Reserved Prefixes (Not Allowed)
+# Events starting with $ (except reserved events above)
+event = Event("user_123", "$custom_event")  # ❌ Not allowed
+
+# Events starting with ss_
+event = Event("user_123", "ss_custom_event")  # ❌ Not allowed
+```
+
+```python Valid Custom Events
+# Use descriptive names without reserved prefixes
+event = Event("user_123", "product_purchased")  # ✅ Allowed
+event = Event("user_123", "checkout_completed")  # ✅ Allowed
+event = Event("user_123", "user_registered")    # ✅ Allowed
+```
+</CodeGroup>
+
+<Info>
+  Event names are case-sensitive. The prefix check looks at the first 3 characters in lowercase.
+</Info>
+
+## Special Properties
+
+Certain property names have special meaning in SuprSend:
+
+### Attachments Property
+
+The `$attachments` property is automatically managed when using the `add_attachment()` method:
+
+```python
+event = Event("user_123", "invoice_generated")
+
+# This automatically adds to properties["$attachments"]
+event.add_attachment("/path/to/invoice.pdf")
+
+# The event properties now contain:
+# {
+#     "$attachments": [
+#         {
+#             "filename": "invoice.pdf",
+#             "content_type": "application/pdf",
+#             "data": "base64_encoded_content"
+#         }
+#     ]
+# }
+```
+
+<Warning>
+  Do not manually modify the `$attachments` property. Use the `add_attachment()` method instead.
+</Warning>
+
+### SDK Version Property
+
+SuprSend automatically adds the SDK version to all events:
+
+```python
+# Automatically added by SDK
+properties["$ss_sdk_version"] = "suprsend/0.x.x;python"
+```
+
+## Event Metadata
+
+In addition to custom properties, SuprSend automatically adds metadata to each event:
+
+| Field | Description | Type |
+|-------|-------------|------|
+| `$insert_id` | Unique identifier for the event | UUID string |
+| `$time` | Timestamp when the event was created | Unix timestamp (milliseconds) |
+| `event` | The event name | String |
+| `distinct_id` | User identifier | String |
+| `env` | Workspace key | String |
+| `$idempotency_key` | Optional deduplication key | String (if provided) |
+| `tenant_id` | Optional tenant identifier | String (if provided) |
+| `brand_id` | Optional brand identifier | String (if provided) |
+
+## Event Size Limits
+
+Events have size restrictions to ensure optimal performance:
+
+<Note>
+  Single events must not exceed 100 KB in size. This includes the event name, properties, and all metadata.
+</Note>
+
+If an event exceeds the size limit, you'll receive an error:
+
+```python
+from suprsend import Event, InputValueError
+
+try:
+    event = Event(
+        "user_123",
+        "large_event",
+        properties={"data": "very large content..."}
+    )
+    response = supr_client.track_event(event)
+except InputValueError as e:
+    print(f"Event size too big: {e}")
+    # Output: "Event size too big - 150000 Bytes, must not cross 100 KB"
+```
+
+## Property Naming Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Snake Case" icon="snake">
+    Name properties using snake_case for consistency:
+    `product_id`, `total_amount`, `user_email`
+  </Card>
+  
+  <Card title="Be Descriptive" icon="spell-check">
+    Use clear, descriptive names:
+    `checkout_total` instead of `total`
+  </Card>
+  
+  <Card title="Avoid Reserved Prefixes" icon="ban">
+    Don't start property names with `$` or `ss_` unless required by SuprSend.
+  </Card>
+  
+  <Card title="Keep It Flat" icon="layer-group">
+    Prefer flat structures over deeply nested objects for better query performance.
+  </Card>
+</CardGroup>
+
+## Example: E-commerce Event
+
+```python
+from suprsend import Suprsend, Event
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+# Well-structured e-commerce event
+event = Event(
+    distinct_id="user_123",
+    event_name="order_completed",
+    properties={
+        # Order details
+        "order_id": "ord_456",
+        "order_total": 249.97,
+        "currency": "USD",
+        "items_count": 3,
+        
+        # Product information
+        "product_ids": ["prod_1", "prod_2", "prod_3"],
+        "product_categories": ["electronics", "accessories"],
+        
+        # Transaction details
+        "payment_method": "credit_card",
+        "shipping_method": "express",
+        "discount_code": "SAVE20",
+        "discount_amount": 50.00,
+        
+        # User context
+        "is_first_purchase": True,
+        "user_tier": "premium",
+        
+        # Location
+        "shipping_country": "USA",
+        "shipping_state": "CA"
+    },
+    idempotency_key="order_456_completed"
+)
+
+response = supr_client.track_event(event)
+```
+
+## Validation
+
+The SDK validates event properties before sending:
+
+```python
+from suprsend import Event, InputValueError
+
+try:
+    # Invalid: properties must be a dictionary
+    event = Event(
+        "user_123",
+        "invalid_event",
+        properties="not a dict"  # ❌ Error
+    )
+    supr_client.track_event(event)
+except InputValueError as e:
+    print(f"Validation error: {e}")
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Tracking Events" icon="chart-line" href="/events/tracking-events">
+    Learn how to track events with the Event class
+  </Card>
+  
+  <Card title="Bulk Events" icon="layer-group" href="/events/bulk-events">
+    Track multiple events efficiently in bulk
+  </Card>
+</CardGroup>

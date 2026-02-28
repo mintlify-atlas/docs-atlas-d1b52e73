@@ -1,0 +1,490 @@
+---
+title: Events
+description: Track user behavior and trigger automated workflows with SuprSend events
+icon: "calendar-star"
+---
+
+## What are Events?
+
+Events in SuprSend represent user actions or occurrences in your application that you want to track. Events can trigger automated workflows, update user properties, and provide valuable insights into user behavior.
+
+<Tip>
+Events are the bridge between user actions in your app and automated notifications. Track what users do, then use that data to send timely, relevant messages.
+</Tip>
+
+## Event Anatomy
+
+Every event has three core components:
+
+1. **distinct_id**: The unique identifier of the user performing the action
+2. **event_name**: A descriptive name for the event (e.g., "purchase_completed", "trial_started")
+3. **properties**: Additional data about the event (optional)
+
+```python
+from suprsend import Event
+
+event = Event(
+    distinct_id="user-123",           # Who performed the action
+    event_name="purchase_completed",  # What action occurred
+    properties={                       # Additional context
+        "order_id": "ORD-789",
+        "amount": 99.99,
+        "currency": "USD",
+        "items": ["Product A", "Product B"]
+    }
+)
+```
+
+## Event Names
+
+Event names should be descriptive and follow a consistent naming convention.
+
+### Naming Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use snake_case" icon="snake">
+    `user_signed_up`, `purchase_completed`, `trial_expired`
+  </Card>
+  <Card title="Be Specific" icon="bullseye">
+    `checkout_completed` is better than just `checkout`
+  </Card>
+  <Card title="Use Past Tense" icon="clock-rotate-left">
+    `order_placed` instead of `place_order`
+  </Card>
+  <Card title="Stay Consistent" icon="arrows-rotate">
+    Pick a convention and stick with it across your app
+  </Card>
+</CardGroup>
+
+### Reserved Event Names
+
+SuprSend reserves certain event names for internal use:
+
+```python
+# Reserved events (do not use these names)
+"$identify"                    # User identification
+"$notification_delivered"      # Notification tracking
+"$notification_dismiss"        # Notification dismissed
+"$notification_clicked"        # Notification clicked
+"$app_launched"               # App opened
+"$user_login"                 # User logged in
+"$user_logout"                # User logged out
+```
+
+<Warning>
+Event names starting with `$` or `ss_` are reserved by SuprSend and cannot be used for custom events. The SDK will raise an `InputValueError` if you try to use them.
+</Warning>
+
+See implementation: `/home/daytona/workspace/source/src/suprsend/event.py:18-22`
+
+## Event Properties
+
+Properties provide additional context about the event. They can be any JSON-serializable data.
+
+### Property Examples
+
+```python
+# E-commerce event
+Event(
+    distinct_id="user-123",
+    event_name="product_viewed",
+    properties={
+        "product_id": "PROD-456",
+        "product_name": "Wireless Headphones",
+        "category": "Electronics",
+        "price": 129.99,
+        "currency": "USD",
+        "in_stock": True
+    }
+)
+
+# User engagement event
+Event(
+    distinct_id="user-123",
+    event_name="video_watched",
+    properties={
+        "video_id": "VID-789",
+        "title": "Getting Started Tutorial",
+        "duration_seconds": 180,
+        "completion_rate": 0.85,
+        "quality": "1080p"
+    }
+)
+
+# Subscription event
+Event(
+    distinct_id="user-123",
+    event_name="subscription_upgraded",
+    properties={
+        "old_plan": "basic",
+        "new_plan": "premium",
+        "monthly_price": 29.99,
+        "billing_cycle": "monthly",
+        "next_billing_date": "2024-03-01"
+    }
+)
+```
+
+### Nested Properties
+
+Properties can include nested objects and arrays:
+
+```python
+Event(
+    distinct_id="user-123",
+    event_name="order_completed",
+    properties={
+        "order_id": "ORD-789",
+        "total": 299.99,
+        "shipping_address": {
+            "street": "123 Main St",
+            "city": "San Francisco",
+            "state": "CA",
+            "zip": "94105",
+            "country": "US"
+        },
+        "items": [
+            {
+                "product_id": "PROD-1",
+                "name": "Product A",
+                "quantity": 2,
+                "price": 99.99
+            },
+            {
+                "product_id": "PROD-2",
+                "name": "Product B",
+                "quantity": 1,
+                "price": 100.01
+            }
+        ]
+    }
+)
+```
+
+## Tracking Events
+
+### Basic Event Tracking
+
+```python
+from suprsend import Suprsend, Event
+
+# Initialize client
+supr_client = Suprsend("your_workspace_key", "your_workspace_secret")
+
+# Create event
+event = Event(
+    distinct_id="user-123",
+    event_name="purchase_completed",
+    properties={
+        "order_id": "ORD-789",
+        "amount": 99.99,
+        "items_count": 3
+    }
+)
+
+# Track the event
+response = supr_client.track_event(event)
+print(response)
+```
+
+### Response Structure
+
+Successful response:
+```python
+{
+    "success": True,
+    "status": "success",
+    "status_code": 202,
+    "message": "message_id_here",
+    "raw_response": {...}
+}
+```
+
+Error response:
+```python
+{
+    "success": False,
+    "status": "fail",
+    "status_code": 400,  # or 500
+    "message": "Error description",
+    "raw_response": {...}
+}
+```
+
+## Advanced Features
+
+### Idempotency Key
+
+Prevent duplicate event tracking by using an idempotency key:
+
+```python
+event = Event(
+    distinct_id="user-123",
+    event_name="purchase_completed",
+    properties={...},
+    idempotency_key="order-789-event"  # Max 64 chars
+)
+
+response = supr_client.track_event(event)
+```
+
+<Info>
+SuprSend will skip processing events with the same idempotency key for 24 hours after the first event.
+</Info>
+
+### Multi-Tenant Support
+
+Track events for specific tenants:
+
+```python
+event = Event(
+    distinct_id="user-123",
+    event_name="purchase_completed",
+    properties={...},
+    tenant_id="tenant-abc"
+)
+```
+
+### Brand ID
+
+Associate events with specific brands:
+
+```python
+event = Event(
+    distinct_id="user-123",
+    event_name="purchase_completed",
+    properties={...},
+    brand_id="brand-xyz"
+)
+```
+
+### Adding Attachments
+
+Attach files to events (useful for receipts, invoices, etc.):
+
+```python
+event = Event(
+    distinct_id="user-123",
+    event_name="invoice_generated",
+    properties={"invoice_id": "INV-123"}
+)
+
+# Add attachment
+event.add_attachment("/path/to/invoice.pdf")
+event.add_attachment("/path/to/receipt.pdf", file_name="Receipt.pdf")
+
+response = supr_client.track_event(event)
+```
+
+## Bulk Event Tracking
+
+For tracking multiple events efficiently, use the bulk API:
+
+```python
+from suprsend import Event
+
+# Create bulk instance
+bulk_ins = supr_client.bulk_events.new_instance()
+
+# Create multiple events
+e1 = Event("user-1", "page_viewed", {"page": "/home"})
+e2 = Event("user-2", "button_clicked", {"button": "signup"})
+e3 = Event("user-3", "form_submitted", {"form": "contact"})
+
+# Append events
+bulk_ins.append(e1, e2, e3)
+# Or append individually
+# bulk_ins.append(e1)
+# bulk_ins.append(e2)
+
+# Track all events
+response = bulk_ins.trigger()
+print(response)
+```
+
+<Note>
+- The SDK automatically chunks requests based on size limits (max 800KB per request)
+- Each chunk is sent as a separate API call
+- Maximum 100 events per bulk API call
+</Note>
+
+See constants: `/home/daytona/workspace/source/src/suprsend/constants.py:17`
+
+## Event Metadata
+
+SuprSend automatically adds metadata to each event:
+
+```python
+{
+    "$insert_id": "uuid-v4-here",           # Unique event ID
+    "$time": 1706543210000,                 # Unix timestamp in milliseconds
+    "env": "your_workspace_key",           # Workspace identifier
+    "properties": {
+        "$ss_sdk_version": "suprsend-py-sdk/version",  # SDK version
+        # ... your custom properties
+    }
+}
+```
+
+See implementation: `/home/daytona/workspace/source/src/suprsend/event.py:81-110`
+
+## Event Use Cases
+
+### Triggering Automated Workflows
+
+Events can trigger workflows automatically when configured in the SuprSend dashboard:
+
+```python
+# Track cart abandonment
+event = Event(
+    distinct_id="user-123",
+    event_name="cart_abandoned",
+    properties={
+        "cart_value": 149.99,
+        "items_count": 3,
+        "abandoned_at": "2024-02-28T10:30:00Z"
+    }
+)
+supr_client.track_event(event)
+
+# SuprSend can automatically trigger:
+# - Immediate reminder email
+# - Follow-up email after 24 hours
+# - Final reminder with discount code after 48 hours
+```
+
+### User Segmentation
+
+Use events to segment users based on behavior:
+
+```python
+# Track feature usage
+Event("user-123", "feature_used", {"feature": "advanced_analytics"})
+Event("user-123", "export_data", {"format": "csv", "rows": 10000})
+
+# Use these events to:
+# - Identify power users
+# - Trigger feature-specific tips
+# - Offer relevant upgrades
+```
+
+### Analytics and Reporting
+
+Track key metrics for business intelligence:
+
+```python
+# Revenue events
+Event("user-123", "purchase_completed", {"revenue": 99.99, "plan": "premium"})
+Event("user-456", "subscription_renewed", {"mrr": 29.99, "months": 12})
+
+# Engagement events
+Event("user-789", "daily_active_user", {"session_duration": 1800})
+Event("user-101", "feature_adoption", {"feature": "ai_assistant"})
+```
+
+## Size Limitations
+
+<Warning>
+A single event body must not exceed **800KB** (819,200 bytes). If exceeded, the SDK will raise an `InputValueError`.
+</Warning>
+
+The SDK validates event size before sending. See implementation: `/home/daytona/workspace/source/src/suprsend/utils.py:61`
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Track Meaningful Actions" icon="bullseye">
+    Focus on events that drive business value or user engagement
+  </Card>
+  <Card title="Include Context" icon="file-lines">
+    Add relevant properties to make events actionable
+  </Card>
+  <Card title="Be Consistent" icon="check-double">
+    Use the same event names and property structures across your app
+  </Card>
+  <Card title="Use Idempotency" icon="shield-halved">
+    Prevent duplicate events with idempotency keys
+  </Card>
+</CardGroup>
+
+### Property Naming Conventions
+
+```python
+# Good: Clear, descriptive property names
+{
+    "product_id": "PROD-123",
+    "product_name": "Wireless Mouse",
+    "price_usd": 29.99,
+    "quantity": 2,
+    "category": "Electronics"
+}
+
+# Avoid: Vague or inconsistent names
+{
+    "id": "PROD-123",        # Which ID?
+    "name": "Wireless Mouse", # Name of what?
+    "price": 29.99,           # What currency?
+    "qty": 2,                 # Abbreviation
+    "cat": "Electronics"      # Unclear abbreviation
+}
+```
+
+## Common Event Patterns
+
+### E-commerce
+
+```python
+# Product browsing
+Event(distinct_id, "product_viewed", {"product_id", "category"})
+Event(distinct_id, "product_added_to_cart", {"product_id", "price"})
+Event(distinct_id, "cart_viewed", {"cart_value", "items_count"})
+Event(distinct_id, "checkout_started", {"cart_value"})
+Event(distinct_id, "payment_info_entered", {"payment_method"})
+Event(distinct_id, "order_completed", {"order_id", "total", "items"})
+```
+
+### SaaS Application
+
+```python
+# User lifecycle
+Event(distinct_id, "user_signed_up", {"source", "plan"})
+Event(distinct_id, "trial_started", {"trial_days"})
+Event(distinct_id, "onboarding_completed", {"steps_completed"})
+Event(distinct_id, "subscription_created", {"plan", "price"})
+Event(distinct_id, "feature_used", {"feature_name", "usage_count"})
+Event(distinct_id, "subscription_cancelled", {"reason", "feedback"})
+```
+
+### Content Platform
+
+```python
+# Content engagement
+Event(distinct_id, "content_viewed", {"content_id", "type"})
+Event(distinct_id, "video_started", {"video_id", "duration"})
+Event(distinct_id, "video_completed", {"video_id", "watch_time"})
+Event(distinct_id, "article_read", {"article_id", "read_percentage"})
+Event(distinct_id, "content_shared", {"content_id", "platform"})
+Event(distinct_id, "comment_posted", {"content_id", "comment_length"})
+```
+
+## Validation
+
+The SDK performs automatic validation before sending events:
+
+- **distinct_id**: Must be a non-empty string
+- **event_name**: Must be a non-empty string, not reserved
+- **properties**: Must be a dictionary (if provided)
+- **Size**: Total event size must not exceed 800KB
+
+See implementation: `/home/daytona/workspace/source/src/suprsend/event.py:38-63`
+
+## Related Concepts
+
+- [Workflows](/core-concepts/workflows) - Use events to trigger automated workflows
+- [Users](/core-concepts/users) - Events are always associated with users
+- [Channels](/core-concepts/channels) - Events can trigger notifications across channels
+
+## API Reference
+
+- [Track Event](/api-reference/events/track) - Complete event API documentation
+- [Bulk Events](/api-reference/events/bulk-track) - Bulk event tracking documentation

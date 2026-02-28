@@ -1,0 +1,222 @@
+---
+title: 'Managing Users'
+description: 'Learn how to create and manage user instances in SuprSend'
+---
+
+## Overview
+
+User management in SuprSend allows you to create and update user profiles, which are identified by a unique `distinct_id`. Once you set up user profiles with channel details and properties, you can trigger workflows using just the `distinct_id`.
+
+## Creating a User Instance
+
+To manage a user, first instantiate a user object using the `get_instance()` method:
+
+```python
+from suprsend import Suprsend
+
+# Initialize SDK
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+# Create a user instance
+distinct_id = "user_123"  # Unique ID for the user in your application
+user = supr_client.user.get_instance(distinct_id=distinct_id)
+```
+
+<Note>
+The `distinct_id` must be a non-empty string that uniquely identifies a user in your application.
+</Note>
+
+## Basic User Operations
+
+### Setting Properties
+
+You can set custom properties on a user using the `set()` method:
+
+```python
+# Set a single property
+user.set("first_name", "John")
+user.set("age", 30)
+
+# Set multiple properties at once
+user.set({
+    "first_name": "John",
+    "last_name": "Doe",
+    "plan": "premium"
+})
+```
+
+### Setting Properties Once
+
+Use `set_once()` to set a property only if it doesn't already exist:
+
+```python
+# Will only set if the property doesn't exist
+user.set_once("signup_date", "2024-01-01")
+
+# Multiple properties
+user.set_once({
+    "signup_date": "2024-01-01",
+    "initial_plan": "free"
+})
+```
+
+### Appending to Lists
+
+Append values to list properties:
+
+```python
+# Append a single value
+user.append("tags", "vip")
+
+# Append multiple values
+user.append({
+    "tags": "premium",
+    "interests": "technology"
+})
+```
+
+### Incrementing Numeric Values
+
+Increment numeric properties:
+
+```python
+# Increment a counter
+user.increment("login_count", 1)
+user.increment("total_spent", 99.99)
+
+# Increment multiple properties
+user.increment({
+    "login_count": 1,
+    "page_views": 5
+})
+```
+
+### Removing from Lists
+
+Remove values from list properties:
+
+```python
+# Remove a single value
+user.remove("tags", "beta")
+
+# Remove multiple values
+user.remove({
+    "tags": "old_tag",
+    "interests": "outdated"
+})
+```
+
+### Unsetting Properties
+
+Delete properties from a user profile:
+
+```python
+# Unset a single property
+user.unset("temporary_flag")
+
+# Unset multiple properties
+user.unset(["old_property", "deprecated_field"])
+```
+
+## Saving Changes
+
+After making changes to a user instance, call `save()` to persist the changes:
+
+```python
+user.set("first_name", "John")
+user.set("email_verified", True)
+
+response = user.save()
+print(response)
+```
+
+### Response Structure
+
+```python
+# Success response
+{
+    "success": True,
+    "status": "success",
+    "status_code": 202,
+    "message": "OK"
+}
+
+# Error response
+{
+    "success": False,
+    "status": "fail",
+    "status_code": 500,
+    "message": "error message"
+}
+```
+
+## Complete Example
+
+```python
+from suprsend import Suprsend
+
+# Initialize
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+# Create user instance
+user = supr_client.user.get_instance("user_123")
+
+# Set user properties
+user.set({
+    "first_name": "John",
+    "last_name": "Doe",
+    "plan": "premium"
+})
+
+# Set initial values
+user.set_once("signup_date", "2024-01-01")
+
+# Add to lists
+user.append("tags", "vip")
+
+# Increment counters
+user.increment("login_count", 1)
+
+# Add communication channels
+user.add_email("john@example.com")
+user.add_sms("+1234567890")
+
+# Save all changes
+response = user.save()
+
+if response["success"]:
+    print("User profile updated successfully")
+else:
+    print(f"Error: {response['message']}")
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Consistent IDs" icon="fingerprint">
+    Always use the same `distinct_id` format across your application for a given user.
+  </Card>
+  <Card title="Batch Updates" icon="layer-group">
+    Group multiple property changes before calling `save()` to minimize API calls.
+  </Card>
+  <Card title="Error Handling" icon="triangle-exclamation">
+    Always check the `success` field in the response before proceeding.
+  </Card>
+  <Card title="Bulk Operations" icon="users">
+    For updating many users, use the [bulk operations](/users/bulk-operations) API.
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="User Properties" icon="sliders" href="/users/user-properties">
+    Learn about setting language, timezone, and locale
+  </Card>
+  <Card title="Channel Management" icon="messages" href="/users/channel-management">
+    Add and manage communication channels
+  </Card>
+  <Card title="Bulk Operations" icon="users" href="/users/bulk-operations">
+    Update multiple users efficiently
+  </Card>
+</CardGroup>

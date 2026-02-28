@@ -1,0 +1,323 @@
+---
+title: "Bulk Users Operations"
+description: "Perform bulk operations on multiple users efficiently"
+---
+
+Bulk user operations allow you to efficiently update multiple user profiles in a single API call. This is ideal for batch processing, imports, or mass updates.
+
+## BulkSubscribers
+
+The `BulkSubscribers` class is used for bulk operations on user profiles using the Subscriber interface.
+
+### Initialization
+
+```python
+from suprsend import Suprsend
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+# Create a bulk subscribers instance
+bulk_instance = supr_client.bulk_users.new_instance()
+```
+
+### append
+
+Add one or more Subscriber instances to the bulk operation.
+
+```python
+# Create individual subscribers
+user1 = supr_client.user.get_instance("user_1")
+user1.add_email("user1@example.com")
+user1.set("name", "John Doe")
+
+user2 = supr_client.user.get_instance("user_2")
+user2.add_email("user2@example.com")
+user2.set("name", "Jane Doe")
+
+# Add to bulk instance
+bulk_instance.append(user1)
+bulk_instance.append(user2)
+
+# Or add multiple at once
+bulk_instance.append(user1, user2)
+```
+
+**Parameters:**
+- `*subscribers` (Subscriber): One or more Subscriber instances
+
+### save
+
+Execute the bulk operation and save all changes.
+
+```python
+# Execute bulk operation
+response = bulk_instance.save()
+
+print(f"Total: {response.total}")
+print(f"Success: {response.success}")
+print(f"Failure: {response.failure}")
+
+if response.failed_records:
+    print(f"Failed records: {response.failed_records}")
+
+if response.warnings:
+    print(f"Warnings: {response.warnings}")
+```
+
+**Returns:**
+- `BulkResponse`: Response object containing operation results
+  - `total` (int): Total number of records processed
+  - `success` (int): Number of successful operations
+  - `failure` (int): Number of failed operations
+  - `failed_records` (list): List of failed records with error details
+  - `warnings` (list): List of warnings
+
+### Complete Example
+
+```python
+from suprsend import Suprsend
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+# Create bulk instance
+bulk_instance = supr_client.bulk_users.new_instance()
+
+# Process multiple users
+user_data = [
+    {"id": "user_1", "email": "user1@example.com", "name": "John Doe"},
+    {"id": "user_2", "email": "user2@example.com", "name": "Jane Doe"},
+    {"id": "user_3", "email": "user3@example.com", "name": "Bob Smith"},
+]
+
+for data in user_data:
+    user = supr_client.user.get_instance(data["id"])
+    user.add_email(data["email"])
+    user.set("name", data["name"])
+    user.set("updated_at", "2024-01-01")
+    bulk_instance.append(user)
+
+# Save all changes
+response = bulk_instance.save()
+
+print(f"Processed {response.total} users")
+print(f"Successful: {response.success}")
+print(f"Failed: {response.failure}")
+
+if response.failed_records:
+    for failed in response.failed_records:
+        print(f"Failed record: {failed}")
+```
+
+## BulkUsersEdit
+
+The `BulkUsersEdit` class is used for bulk operations on user profiles using the UserEdit interface.
+
+### Initialization
+
+```python
+from suprsend import Suprsend
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+# Create a bulk users edit instance
+bulk_edit = supr_client.users.get_bulk_edit_instance()
+```
+
+### append
+
+Add one or more UserEdit instances to the bulk operation.
+
+```python
+# Create individual user edits
+user_edit_1 = supr_client.users.get_edit_instance("user_1")
+user_edit_1.set("plan", "premium")
+user_edit_1.add_email("user1@example.com")
+
+user_edit_2 = supr_client.users.get_edit_instance("user_2")
+user_edit_2.set("plan", "premium")
+user_edit_2.add_email("user2@example.com")
+
+# Add to bulk instance
+bulk_edit.append(user_edit_1)
+bulk_edit.append(user_edit_2)
+
+# Or add multiple at once
+bulk_edit.append(user_edit_1, user_edit_2)
+```
+
+**Parameters:**
+- `*users` (UserEdit): One or more UserEdit instances
+
+### save
+
+Execute the bulk edit operation.
+
+```python
+# Execute bulk operation
+response = bulk_edit.save()
+
+print(f"Total: {response.total}")
+print(f"Success: {response.success}")
+print(f"Failure: {response.failure}")
+
+if response.failed_records:
+    print(f"Failed records: {response.failed_records}")
+```
+
+**Returns:**
+- `BulkResponse`: Response object containing operation results
+  - `total` (int): Total number of records processed
+  - `success` (int): Number of successful operations
+  - `failure` (int): Number of failed operations
+  - `failed_records` (list): List of failed records with error details
+  - `warnings` (list): List of warnings
+
+### Complete Example
+
+```python
+from suprsend import Suprsend
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+# Create bulk edit instance
+bulk_edit = supr_client.users.get_bulk_edit_instance()
+
+# Upgrade multiple users to premium
+user_ids = ["user_1", "user_2", "user_3", "user_4", "user_5"]
+
+for user_id in user_ids:
+    user_edit = supr_client.users.get_edit_instance(user_id)
+    user_edit.set("plan", "premium")
+    user_edit.set("upgraded_at", "2024-01-01")
+    user_edit.increment("upgrade_count", 1)
+    user_edit.append("tags", "premium_user")
+    bulk_edit.append(user_edit)
+
+# Execute bulk operation
+response = bulk_edit.save()
+
+print(f"Processed {response.total} users")
+print(f"Successful upgrades: {response.success}")
+print(f"Failed upgrades: {response.failure}")
+
+if response.failed_records:
+    for failed in response.failed_records:
+        print(f"Failed: {failed['record']} - Error: {failed['error']}")
+```
+
+## Best Practices
+
+### Batch Size Management
+
+The SDK automatically handles chunking of bulk operations. The limits are:
+- Maximum records per chunk: Configured by `MAX_IDENTITY_EVENTS_IN_BULK_API`
+- Maximum size per chunk: Configured by `BODY_MAX_APPARENT_SIZE_IN_BYTES`
+
+```python
+# The SDK will automatically split large batches
+bulk_instance = supr_client.bulk_users.new_instance()
+
+# Add 1000 users - SDK handles chunking
+for i in range(1000):
+    user = supr_client.user.get_instance(f"user_{i}")
+    user.set("batch_processed", True)
+    bulk_instance.append(user)
+
+# Automatically chunked and sent in multiple API calls
+response = bulk_instance.save()
+```
+
+### Error Handling
+
+```python
+bulk_instance = supr_client.bulk_users.new_instance()
+
+# Add users
+for user_data in user_list:
+    try:
+        user = supr_client.user.get_instance(user_data["id"])
+        user.add_email(user_data["email"])
+        user.set("name", user_data["name"])
+        bulk_instance.append(user)
+    except Exception as e:
+        print(f"Error creating user {user_data['id']}: {e}")
+        continue
+
+# Execute and handle response
+response = bulk_instance.save()
+
+if response.failure > 0:
+    print(f"Warning: {response.failure} operations failed")
+    for failed in response.failed_records:
+        print(f"Failed record: {failed['record']}")
+        print(f"Error: {failed['error']}")
+        print(f"Error code: {failed['code']}")
+
+if response.warnings:
+    print("Warnings encountered:")
+    for warning in response.warnings:
+        print(f"  - {warning}")
+```
+
+### Performance Tips
+
+1. **Reuse instances**: Create a single bulk instance and add all users before calling save.
+2. **Avoid validation errors**: Validate user data before creating Subscriber/UserEdit instances.
+3. **Monitor response**: Check the response for failures and warnings to identify issues.
+4. **Use appropriate interface**: Use BulkUsersEdit for edit operations and BulkSubscribers for full profile updates.
+
+```python
+# Good: Single bulk instance
+bulk_instance = supr_client.bulk_users.new_instance()
+for user_data in large_user_list:
+    user = supr_client.user.get_instance(user_data["id"])
+    user.set("name", user_data["name"])
+    bulk_instance.append(user)
+response = bulk_instance.save()
+
+# Bad: Multiple save calls
+for user_data in large_user_list:
+    bulk_instance = supr_client.bulk_users.new_instance()
+    user = supr_client.user.get_instance(user_data["id"])
+    user.set("name", user_data["name"])
+    bulk_instance.append(user)
+    response = bulk_instance.save()  # Inefficient!
+```
+
+## Response Object
+
+The `BulkResponse` object contains the following properties:
+
+```python
+response = bulk_instance.save()
+
+# Response properties
+response.total       # Total records processed
+response.success     # Number of successful operations
+response.failure     # Number of failed operations
+response.failed_records  # List of failed records with details
+response.warnings    # List of warnings
+```
+
+### Failed Record Structure
+
+Each failed record contains:
+
+```python
+{
+    "record": {...},      # The original record data
+    "error": "...",       # Error message
+    "code": 500          # Error code
+}
+```
+
+## Comparison: BulkSubscribers vs BulkUsersEdit
+
+| Feature | BulkSubscribers | BulkUsersEdit |
+|---------|----------------|---------------|
+| Base Class | Subscriber | UserEdit |
+| Use Case | Full profile updates | Edit operations |
+| API Endpoint | `/event/` | `/event/` |
+| Best For | Complete profile sync | Incremental updates |
+
+Both classes support the same operations (set, append, increment, etc.) and provide similar functionality. Choose based on your workflow preference.

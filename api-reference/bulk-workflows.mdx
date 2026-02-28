@@ -1,0 +1,366 @@
+---
+title: "Bulk Workflows"
+description: "Factory and classes for efficient bulk workflow triggering operations"
+---
+
+## Overview
+
+Bulk workflow operations allow you to trigger multiple workflows efficiently in a single API call. The SDK automatically handles batching, chunking, and size management to optimize performance while respecting API limits.
+
+## BulkWorkflowsFactory
+
+Factory class for creating bulk workflow instances.
+
+### Constructor
+
+```python
+BulkWorkflowsFactory(config)
+```
+
+<ParamField path="config" type="object" required>
+  SDK configuration object containing workspace credentials and settings.
+</ParamField>
+
+<Note>
+You typically don't instantiate this class directly. It's created automatically when you initialize the SuprSend client and is accessible via `supr_client.bulk_workflows`.
+</Note>
+
+### Methods
+
+#### new_instance()
+
+Creates a new bulk workflows instance for batching workflow triggers.
+
+```python
+new_instance() -> BulkWorkflows
+```
+
+##### Returns
+
+<ResponseField name="BulkWorkflows" type="BulkWorkflows">
+  A new instance of BulkWorkflows for collecting and triggering multiple workflows.
+</ResponseField>
+
+##### Example
+
+```python
+from suprsend import Suprsend, Workflow
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+# Create a new bulk instance
+bulk_instance = supr_client.bulk_workflows.new_instance()
+
+# Append workflows
+for user in users:
+    workflow = Workflow(
+        body={
+            "workflow": "monthly_report",
+            "recipients": [{"distinct_id": user.id}],
+            "data": {"month": "January", "stats": user.stats}
+        },
+        idempotency_key=f"report_{user.id}_jan_2024"
+    )
+    bulk_instance.append(workflow)
+
+# Trigger all workflows
+response = bulk_instance.trigger()
+```
+
+## BulkWorkflows
+
+Main class for managing and triggering bulk workflow operations.
+
+### Constructor
+
+```python
+BulkWorkflows(config)
+```
+
+<ParamField path="config" type="object" required>
+  SDK configuration object.
+</ParamField>
+
+<Note>
+Create instances using `supr_client.bulk_workflows.new_instance()` instead of direct instantiation.
+</Note>
+
+### Methods
+
+#### append()
+
+Adds one or more workflows to the bulk operation.
+
+```python
+append(*workflows: Workflow) -> None
+```
+
+##### Parameters
+
+<ParamField path="workflows" type="Workflow" required>
+  One or more Workflow instances to add to the bulk operation. Use positional arguments to add multiple workflows.
+</ParamField>
+
+##### Example
+
+```python
+from suprsend import Workflow
+
+bulk_instance = supr_client.bulk_workflows.new_instance()
+
+# Append one workflow
+workflow1 = Workflow(body={...})
+bulk_instance.append(workflow1)
+
+# Append multiple workflows at once
+workflow2 = Workflow(body={...})
+workflow3 = Workflow(body={...})
+bulk_instance.append(workflow2, workflow3)
+
+# Append from a list
+all_workflows = [w1, w2, w3, w4, w5]
+bulk_instance.append(*all_workflows)
+```
+
+##### Notes
+
+- Workflows are deep-copied when appended to prevent unintended mutations
+- Invalid workflows (non-Workflow instances or None values) are silently ignored
+- No limit on the number of workflows you can append; the SDK handles chunking automatically
+
+#### trigger()
+
+Validates, chunks, and triggers all appended workflows.
+
+```python
+trigger() -> BulkResponse
+```
+
+##### Returns
+
+<ResponseField name="BulkResponse" type="BulkResponse">
+  A BulkResponse object containing the results of the bulk operation.
+</ResponseField>
+
+##### Example
+
+```python
+bulk_instance = supr_client.bulk_workflows.new_instance()
+
+# Append workflows
+for i in range(100):
+    workflow = Workflow(
+        body={
+            "workflow": "notification",
+            "recipients": [{"distinct_id": f"user_{i}"}]
+        }
+    )
+    bulk_instance.append(workflow)
+
+# Trigger all workflows
+response = bulk_instance.trigger()
+
+# Access response details
+print(f"Total workflows: {response.total}")
+print(f"Successful: {response.success}")
+print(f"Failed: {response.failure}")
+
+if response.failure > 0:
+    print("Failed records:")
+    for failed in response.failed_records:
+        print(f"  Error: {failed['error']}")
+        print(f"  Record: {failed['record']}")
+```
+
+## BulkResponse
+
+Response object returned by `BulkWorkflows.trigger()`.
+
+### Properties
+
+<ResponseField name="status" type="str">
+  Overall status of the bulk operation: `"success"` or `"fail"`.
+</ResponseField>
+
+<ResponseField name="total" type="int">
+  Total number of workflows in the bulk operation.
+</ResponseField>
+
+<ResponseField name="success" type="int">
+  Number of workflows that were successfully triggered.
+</ResponseField>
+
+<ResponseField name="failure" type="int">
+  Number of workflows that failed to trigger.
+</ResponseField>
+
+<ResponseField name="failed_records" type="list[dict]">
+  List of failed workflow records with error details.
+</ResponseField>
+
+### Failed Record Structure
+
+Each failed record in `failed_records` contains:
+
+```python
+{
+    "record": {<workflow_body>},  # The workflow that failed
+    "error": "Error message",      # Description of the error
+    "code": 400                    # HTTP status code or 500 for validation errors
+}
+```
+
+### Example Response
+
+```python
+{
+    "status": "success",
+    "total": 100,
+    "success": 98,
+    "failure": 2,
+    "failed_records": [
+        {
+            "record": {"workflow": "test", "recipients": []},
+            "error": "Recipients list cannot be empty",
+            "code": 500
+        },
+        {
+            "record": {"workflow": "test2", ...},
+            "error": "Workflow body too big - 110000 Bytes",
+            "code": 500
+        }
+    ]
+}
+```
+
+## Bulk Operation Limits
+
+### Per-Request Limits
+
+<ParamField path="MAX_WORKFLOWS_IN_BULK_API" type="int">
+  Maximum number of workflows per API request: **100 workflows**
+</ParamField>
+
+<ParamField path="BODY_MAX_APPARENT_SIZE_IN_BYTES" type="int">
+  Maximum apparent body size per request: **100 KB (102,400 bytes)**
+</ParamField>
+
+### Automatic Chunking
+
+The SDK automatically splits your workflows into multiple chunks when:
+
+1. The number of workflows exceeds 100
+2. The combined size of workflows exceeds 100 KB
+
+Each chunk is sent as a separate API request, and responses are consolidated into a single `BulkResponse`.
+
+### Attachments in Bulk Operations
+
+<Warning>
+By default, attachments are **not supported** in bulk workflow operations. If `ALLOW_ATTACHMENTS_IN_BULK_API` is False, the SDK automatically removes attachments from workflows before sending.
+</Warning>
+
+## Complete Example
+
+```python
+from suprsend import Suprsend, Workflow
+
+# Initialize client
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+# Create bulk instance
+bulk_instance = supr_client.bulk_workflows.new_instance()
+
+# Append workflows
+users = fetch_users()  # Your function to get users
+
+for user in users:
+    workflow = Workflow(
+        body={
+            "workflow": "weekly_newsletter",
+            "recipients": [
+                {
+                    "distinct_id": user.id,
+                    "$email": [user.email],
+                    "$channels": ["email"]
+                }
+            ],
+            "data": {
+                "user_name": user.name,
+                "unread_count": user.unread_messages,
+                "highlights": user.weekly_highlights
+            }
+        },
+        idempotency_key=f"newsletter_week_5_{user.id}",
+        tenant_id=user.tenant_id
+    )
+    bulk_instance.append(workflow)
+
+# Trigger all workflows
+try:
+    response = bulk_instance.trigger()
+    
+    print(f"Bulk operation completed")
+    print(f"Total: {response.total}")
+    print(f"Success: {response.success}")
+    print(f"Failures: {response.failure}")
+    
+    # Log failures for investigation
+    if response.failure > 0:
+        for failed_record in response.failed_records:
+            log_error(
+                message=failed_record["error"],
+                record=failed_record["record"],
+                code=failed_record["code"]
+            )
+            
+except Exception as e:
+    print(f"Unexpected error during bulk trigger: {e}")
+```
+
+## Validation and Error Handling
+
+### Pre-Validation
+
+Before sending workflows to the API, the SDK:
+
+1. Validates each workflow's body schema
+2. Checks individual workflow size limits
+3. Removes invalid workflows and adds them to `failed_records`
+
+### Common Validation Errors
+
+- **Workflow body too big**: Individual workflow exceeds 100 KB
+- **Invalid schema**: Missing required fields like `workflow` or `recipients`
+- **Invalid data types**: Non-dictionary body or malformed data
+
+### API Errors
+
+If an API request fails:
+
+- All workflows in that chunk are marked as failed
+- The error message and status code are included in each failed record
+- Other chunks may still succeed
+
+## Best Practices
+
+1. **Batch Similar Workflows**: Group workflows with similar characteristics for better chunking efficiency
+2. **Use Idempotency Keys**: Always include idempotency keys to safely retry failed chunks
+3. **Handle Failed Records**: Implement retry logic or alerting for failed workflows
+4. **Monitor Bulk Sizes**: Keep track of how many workflows you're batching to estimate API usage
+5. **Avoid Attachments**: Don't use attachments in bulk operations; they're not supported by default
+6. **Chunk-Friendly Data**: Keep individual workflow bodies small to maximize workflows per chunk
+7. **Log Responses**: Store bulk response details for debugging and analytics
+
+## Performance Considerations
+
+- **Bulk vs Individual**: Bulk triggering is ~10x faster than individual triggers for large batches
+- **Optimal Batch Size**: 50-100 workflows per bulk operation provides the best performance
+- **Network Efficiency**: Fewer HTTP requests reduce network overhead and latency
+- **Memory Usage**: The SDK creates deep copies of workflows, so very large bulk operations may use significant memory
+
+## Related
+
+- [Workflow](/api-reference/workflow) - Create workflow instances for bulk operations
+- [WorkflowsApi](/api-reference/workflows-api) - Alternative bulk trigger method
+- [BulkResponse](/api-reference/bulk-response) - Detailed response object reference

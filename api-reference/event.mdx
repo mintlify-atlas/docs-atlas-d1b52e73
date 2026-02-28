@@ -1,0 +1,300 @@
+---
+title: Event
+description: Track user events and activities
+icon: chart-line
+---
+
+The `Event` class represents a user event that you want to track in SuprSend.
+
+## Constructor
+
+```python
+from suprsend import Event
+
+event = Event(
+    distinct_id="user123",
+    event_name="product_purchased",
+    properties={"product_id": "SKU-789", "amount": 99.99},
+    idempotency_key="purchase-12345",
+    tenant_id="org-456",
+    brand_id="brand-1"
+)
+```
+
+## Parameters
+
+<ParamField path="distinct_id" type="string" required>
+  Unique identifier for the user in your application
+</ParamField>
+
+<ParamField path="event_name" type="string" required>
+  Name of the event to track. Cannot start with `$` or `ss_` (except for reserved events)
+</ParamField>
+
+<ParamField path="properties" type="dict" default="{}">
+  Dictionary of event properties and attributes
+</ParamField>
+
+<ParamField path="idempotency_key" type="string">
+  Unique key to prevent duplicate event tracking (max 64 characters)
+</ParamField>
+
+<ParamField path="tenant_id" type="string">
+  Tenant identifier for multi-tenant applications
+</ParamField>
+
+<ParamField path="brand_id" type="string">
+  Brand identifier for white-labeling
+</ParamField>
+
+## Methods
+
+### add_attachment()
+
+Add a file attachment to the event.
+
+```python
+event.add_attachment(
+    file_path="/path/to/invoice.pdf",
+    file_name="invoice.pdf",
+    ignore_if_error=False
+)
+```
+
+**Parameters:**
+
+<ParamField path="file_path" type="string" required>
+  Absolute or relative path to the file
+</ParamField>
+
+<ParamField path="file_name" type="string">
+  Custom filename (defaults to original filename)
+</ParamField>
+
+<ParamField path="ignore_if_error" type="boolean" default="False">
+  If True, silently ignore attachment errors instead of raising exceptions
+</ParamField>
+
+### as_json()
+
+Get the event as a JSON-serializable dictionary.
+
+```python
+event_dict = event.as_json()
+print(event_dict)
+# {
+#     "event": "product_purchased",
+#     "distinct_id": "user123",
+#     "properties": {"product_id": "SKU-789"},
+#     "$idempotency_key": "purchase-12345"
+# }
+```
+
+**Returns:** Dictionary representation of the event
+
+### get_final_json()
+
+Internal method that validates and prepares the event for sending. Called automatically by the SDK.
+
+```python
+event_dict, size = event.get_final_json(config, is_part_of_bulk=False)
+```
+
+**Returns:** Tuple of (event_dict, apparent_size_in_bytes)
+
+## Reserved event names
+
+These event names are reserved by SuprSend and can be used without restriction:
+
+- `$identify`
+- `$notification_delivered`
+- `$notification_dismiss`
+- `$notification_clicked`
+- `$app_launched`
+- `$user_login`
+- `$user_logout`
+
+<Warning>
+Event names starting with `$` or `ss_` (except reserved names) will raise an `InputValueError`.
+</Warning>
+
+## Examples
+
+### Basic event tracking
+
+```python
+from suprsend import Suprsend, Event
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+event = Event(
+    distinct_id="user123",
+    event_name="page_viewed",
+    properties={"page": "/pricing"}
+)
+
+response = supr_client.track_event(event)
+```
+
+### Event with all parameters
+
+```python
+event = Event(
+    distinct_id="user@example.com",
+    event_name="purchase_completed",
+    properties={
+        "order_id": "ORDER-12345",
+        "amount": 149.99,
+        "currency": "USD",
+        "items": [
+            {"id": "SKU-001", "name": "Product A", "quantity": 2},
+            {"id": "SKU-002", "name": "Product B", "quantity": 1}
+        ]
+    },
+    idempotency_key="order-12345-completed",
+    tenant_id="enterprise-org-123",
+    brand_id="premium-brand"
+)
+
+response = supr_client.track_event(event)
+```
+
+### Event with attachment
+
+```python
+event = Event(
+    distinct_id="user123",
+    event_name="document_uploaded",
+    properties={"document_type": "contract"}
+)
+
+event.add_attachment("/path/to/contract.pdf")
+
+response = supr_client.track_event(event)
+```
+
+### Using reserved event names
+
+```python
+# Track user login
+login_event = Event(
+    distinct_id="user123",
+    event_name="$user_login",
+    properties={"login_method": "google_oauth"}
+)
+supr_client.track_event(login_event)
+
+# Track notification click
+click_event = Event(
+    distinct_id="user123",
+    event_name="$notification_clicked",
+    properties={
+        "notification_id": "notif-789",
+        "channel": "email"
+    }
+)
+supr_client.track_event(click_event)
+```
+
+## Response structure
+
+### Success response
+
+```python
+{
+    "success": True,
+    "status": "success",
+    "status_code": 202,
+    "message": "message_id_123",
+    "raw_response": {
+        "message_id": "message_id_123",
+        "status": "accepted"
+    }
+}
+```
+
+### Error response
+
+```python
+{
+    "success": False,
+    "status": "fail",
+    "status_code": 400,
+    "message": "Invalid event name",
+    "raw_response": {
+        "error": {
+            "message": "Invalid event name",
+            "code": "VALIDATION_ERROR"
+        }
+    }
+}
+```
+
+## Size limits
+
+- Maximum event size: **100 KB** (including properties and attachments)
+- The SDK calculates apparent size including:
+  - Event payload
+  - Runtime keys (~200 bytes)
+  - Attachment overhead (~2100 bytes per attachment)
+
+<Info>
+If your event exceeds the size limit, an `InputValueError` will be raised.
+</Info>
+
+## Validation
+
+The Event class validates:
+
+- `distinct_id` is a non-empty string
+- `event_name` is a non-empty string
+- `event_name` doesn't start with `$` or `ss_` (unless it's a reserved event)
+- `properties` is a dictionary
+- Total event size doesn't exceed 100 KB
+
+## Error handling
+
+```python
+from suprsend import Event, InputValueError
+
+try:
+    event = Event(
+        distinct_id="user123",
+        event_name="$custom_event",  # Invalid: starts with $
+        properties={"key": "value"}
+    )
+    response = supr_client.track_event(event)
+except InputValueError as e:
+    print(f"Validation error: {e}")
+```
+
+## Best practices
+
+<CardGroup cols={2}>
+  <Card title="Use meaningful names" icon="tag">
+    Choose descriptive event names that clearly indicate the action (e.g., `product_purchased`, not `action1`)
+  </Card>
+  <Card title="Consistent naming" icon="equals">
+    Use a consistent naming convention (e.g., snake_case) across all events
+  </Card>
+  <Card title="Include context" icon="info">
+    Add relevant properties to provide context for analytics and segmentation
+  </Card>
+  <Card title="Use idempotency" icon="shield">
+    Always include idempotency keys for critical events to prevent duplicates
+  </Card>
+</CardGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Track events" icon="chart-line" href="/events/tracking-events">
+    Learn how to track events
+  </Card>
+  <Card title="Bulk events" icon="layer-group" href="/api-reference/bulk-events">
+    Track events in bulk
+  </Card>
+  <Card title="Event properties" icon="list" href="/events/event-properties">
+    Learn about event properties
+  </Card>
+</CardGroup>

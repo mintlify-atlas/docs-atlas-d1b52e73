@@ -1,0 +1,193 @@
+---
+title: "Introduction"
+description: "SuprSend Python SDK - Integrate multi-channel notifications into your Python application"
+---
+
+<img
+  className="block dark:hidden"
+  src="/images/hero-light.svg"
+  alt="SuprSend Python SDK"
+/>
+<img
+  className="hidden dark:block"
+  src="/images/hero-dark.svg"
+  alt="SuprSend Python SDK"
+/>
+
+## Welcome to SuprSend Python SDK
+
+The SuprSend Python SDK provides a simple and powerful way to integrate multi-channel notifications into your Python applications. Send notifications across email, SMS, WhatsApp, push notifications, Slack, and more through a single unified API.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card
+    title="Multi-Channel Workflows"
+    icon="workflow"
+  >
+    Trigger pre-configured workflows across email, SMS, push notifications, WhatsApp, Slack, and MS Teams with a single API call.
+  </Card>
+  <Card
+    title="User Management"
+    icon="users"
+  >
+    Manage user profiles with channel preferences, properties, timezone, and preferred language settings.
+  </Card>
+  <Card
+    title="Event Tracking"
+    icon="chart-line"
+  >
+    Track user events and trigger automated workflows based on user behavior and properties.
+  </Card>
+  <Card
+    title="Bulk Operations"
+    icon="layer-group"
+  >
+    Process workflows, user updates, and events in bulk with automatic batching and optimized API calls.
+  </Card>
+  <Card
+    title="File Attachments"
+    icon="paperclip"
+  >
+    Add file attachments to notifications with automatic MIME type detection and base64 encoding.
+  </Card>
+  <Card
+    title="Multi-Tenancy"
+    icon="building"
+  >
+    Support multiple brands and tenants with isolated notification templates and configurations.
+  </Card>
+  <Card
+    title="Idempotency"
+    icon="shield-check"
+  >
+    Prevent duplicate notifications with built-in idempotency key support for all operations.
+  </Card>
+  <Card
+    title="Type Safety"
+    icon="code"
+  >
+    Full Python 3.9+ support with comprehensive validation and error handling.
+  </Card>
+</CardGroup>
+
+## Quick Example
+
+Here's a simple example of triggering a workflow:
+
+```python
+from suprsend import Suprsend, WorkflowTriggerRequest
+
+# Initialize SDK
+supr_client = Suprsend("your_workspace_key", "your_workspace_secret")
+
+# Trigger a workflow
+wf = WorkflowTriggerRequest(
+    body={
+        "workflow": "purchase-made",
+        "recipients": [
+            {
+                "distinct_id": "user_123",
+                "$email": ["user@example.com"],
+            }
+        ],
+        "data": {
+            "first_name": "John",
+            "order_id": "#12345",
+        }
+    }
+)
+
+response = supr_client.workflows.trigger(wf)
+print(response)
+```
+
+## What You Can Build
+
+<AccordionGroup>
+  <Accordion icon="bell" title="Transactional Notifications">
+    Send order confirmations, password resets, account updates, and other triggered notifications across multiple channels.
+  </Accordion>
+  
+  <Accordion icon="megaphone" title="Marketing Campaigns">
+    Create and send targeted marketing campaigns based on user segments, behavior, and preferences.
+  </Accordion>
+  
+  <Accordion icon="chart-mixed" title="Behavioral Triggers">
+    Set up automated workflows triggered by user actions, events, and milestones.
+  </Accordion>
+  
+  <Accordion icon="inbox" title="Digest Notifications">
+    Aggregate user activities and send periodic digests via email, Slack, or other channels.
+  </Accordion>
+</AccordionGroup>
+
+## System Requirements
+
+<CardGroup cols={2}>
+  <Card title="Python Version" icon="python">
+    Python 3.9 or higher
+  </Card>
+  <Card title="Dependencies" icon="box">
+    `jsonschema`, `requests` (automatically installed)
+  </Card>
+</CardGroup>
+
+<Note>
+  **Optional**: Install with `[magic]` extra for better MIME type detection when adding file attachments.
+</Note>
+
+## Get Started
+
+<CardGroup cols={2}>
+  <Card
+    title="Installation"
+    icon="download"
+    href="/installation"
+  >
+    Install the SDK and set up your environment
+  </Card>
+  <Card
+    title="Quickstart"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Get up and running in 5 minutes
+  </Card>
+  <Card
+    title="Core Concepts"
+    icon="book"
+    href="/core-concepts/workflows"
+  >
+    Learn about workflows, users, and events
+  </Card>
+  <Card
+    title="API Reference"
+    icon="code"
+    href="/api-reference/suprsend"
+  >
+    Explore the complete API documentation
+  </Card>
+</CardGroup>
+
+## Support Channels
+
+The SDK supports notifications across:
+
+- **Email** - Rich HTML emails with attachments
+- **SMS** - Text messages via multiple providers
+- **WhatsApp** - WhatsApp messages and templates
+- **Push Notifications** - Android (FCM, Xiaomi, Oppo) and iOS (APNS)
+- **Slack** - Direct messages and channel posts
+- **MS Teams** - Team channels and direct messages
+- **Webpush** - Browser push notifications
+
+## Need Help?
+
+<Card
+  title="SuprSend Documentation"
+  icon="book-open"
+  href="https://docs.suprsend.com"
+>
+  Visit the main SuprSend documentation for platform guides, tutorials, and best practices.
+</Card>

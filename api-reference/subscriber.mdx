@@ -1,0 +1,488 @@
+---
+title: "Subscriber"
+description: "Subscriber class for managing user profile and channel information"
+---
+
+The `Subscriber` class is used to manage user profile properties and communication channel information. It provides methods to set properties, manage channels like email, SMS, WhatsApp, and push notifications.
+
+## Initialization
+
+```python
+from suprsend import Suprsend
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+# Get a subscriber instance
+subscriber = supr_client.user.get_instance("distinct_id")
+```
+
+## Properties Methods
+
+### set
+
+Set user properties. If property already exists, it will be overwritten.
+
+```python
+# Set a single property
+subscriber.set("key", "value")
+
+# Set multiple properties
+subscriber.set({
+    "name": "John Doe",
+    "age": 30,
+    "city": "New York"
+})
+```
+
+**Parameters:**
+- `arg1` (str | dict): Property key (string) or dictionary of key-value pairs
+- `arg2` (Any, optional): Property value (required if arg1 is string)
+
+### set_once
+
+Set user properties only if they don't already exist.
+
+```python
+# Set once a single property
+subscriber.set_once("signup_date", "2024-01-01")
+
+# Set once multiple properties
+subscriber.set_once({
+    "signup_date": "2024-01-01",
+    "initial_plan": "free"
+})
+```
+
+**Parameters:**
+- `arg1` (str | dict): Property key (string) or dictionary of key-value pairs
+- `arg2` (Any, optional): Property value (required if arg1 is string)
+
+### append
+
+Append value(s) to a list property.
+
+```python
+# Append a single value
+subscriber.append("tags", "premium")
+
+# Append multiple values
+subscriber.append({
+    "tags": "vip",
+    "interests": "technology"
+})
+```
+
+**Parameters:**
+- `arg1` (str | dict): Property key (string) or dictionary of key-value pairs
+- `arg2` (Any, optional): Value to append (required if arg1 is string)
+
+### remove
+
+Remove value(s) from a list property.
+
+```python
+# Remove a single value
+subscriber.remove("tags", "trial")
+
+# Remove multiple values
+subscriber.remove({
+    "tags": "inactive",
+    "interests": "sports"
+})
+```
+
+**Parameters:**
+- `arg1` (str | dict): Property key (string) or dictionary of key-value pairs
+- `arg2` (Any, optional): Value to remove (required if arg1 is string)
+
+### increment
+
+Increment a numeric property.
+
+```python
+# Increment a single property
+subscriber.increment("login_count", 1)
+
+# Increment multiple properties
+subscriber.increment({
+    "login_count": 1,
+    "purchase_count": 1
+})
+```
+
+**Parameters:**
+- `arg1` (str | dict): Property key (string) or dictionary of key-value pairs
+- `arg2` (Any, optional): Increment value (required if arg1 is string)
+
+### unset
+
+Remove properties from user profile.
+
+```python
+# Unset a single property
+subscriber.unset("temporary_flag")
+
+# Unset multiple properties
+subscriber.unset(["temp1", "temp2", "temp3"])
+```
+
+**Parameters:**
+- `key` (str | list[str]): Property key or list of keys to remove
+
+## User Preferences
+
+### set_preferred_language
+
+Set the user's preferred language for communications.
+
+```python
+subscriber.set_preferred_language("en")
+```
+
+**Parameters:**
+- `lang_code` (str): Language code (e.g., "en", "es", "fr")
+
+### set_locale
+
+Set the user's locale.
+
+```python
+subscriber.set_locale("en_US")
+```
+
+**Parameters:**
+- `locale_code` (str): Locale code (e.g., "en_US", "fr_FR")
+
+### set_timezone
+
+Set the user's timezone.
+
+```python
+subscriber.set_timezone("America/New_York")
+```
+
+**Parameters:**
+- `timezone` (str): Timezone string (e.g., "America/New_York", "Asia/Kolkata")
+
+## Channel Management
+
+### Email
+
+#### add_email
+
+Add an email address to the user's profile.
+
+```python
+subscriber.add_email("user@example.com")
+```
+
+**Parameters:**
+- `value` (str): Email address
+
+#### remove_email
+
+Remove an email address from the user's profile.
+
+```python
+subscriber.remove_email("old@example.com")
+```
+
+**Parameters:**
+- `value` (str): Email address to remove
+
+### SMS
+
+#### add_sms
+
+Add a phone number for SMS communications.
+
+```python
+subscriber.add_sms("+1234567890")
+```
+
+**Parameters:**
+- `value` (str): Phone number with country code
+
+#### remove_sms
+
+Remove a phone number from SMS communications.
+
+```python
+subscriber.remove_sms("+1234567890")
+```
+
+**Parameters:**
+- `value` (str): Phone number to remove
+
+### WhatsApp
+
+#### add_whatsapp
+
+Add a WhatsApp number.
+
+```python
+subscriber.add_whatsapp("+1234567890")
+```
+
+**Parameters:**
+- `value` (str): WhatsApp number with country code
+
+#### remove_whatsapp
+
+Remove a WhatsApp number.
+
+```python
+subscriber.remove_whatsapp("+1234567890")
+```
+
+**Parameters:**
+- `value` (str): WhatsApp number to remove
+
+### Android Push
+
+#### add_androidpush
+
+Add an Android push token.
+
+```python
+subscriber.add_androidpush("fcm_token_here")
+
+# With provider
+subscriber.add_androidpush("fcm_token_here", provider="fcm")
+```
+
+**Parameters:**
+- `value` (str): Android push token
+- `provider` (str, optional): Push provider (e.g., "fcm")
+
+#### remove_androidpush
+
+Remove an Android push token.
+
+```python
+subscriber.remove_androidpush("fcm_token_here")
+```
+
+**Parameters:**
+- `value` (str): Android push token to remove
+- `provider` (str, optional): Push provider
+
+### iOS Push
+
+#### add_iospush
+
+Add an iOS push token.
+
+```python
+subscriber.add_iospush("apns_token_here")
+
+# With provider
+subscriber.add_iospush("apns_token_here", provider="apns")
+```
+
+**Parameters:**
+- `value` (str): iOS push token
+- `provider` (str, optional): Push provider (e.g., "apns")
+
+#### remove_iospush
+
+Remove an iOS push token.
+
+```python
+subscriber.remove_iospush("apns_token_here")
+```
+
+**Parameters:**
+- `value` (str): iOS push token to remove
+- `provider` (str, optional): Push provider
+
+### Web Push
+
+#### add_webpush
+
+Add a web push subscription.
+
+```python
+subscriber.add_webpush({
+    "endpoint": "https://fcm.googleapis.com/fcm/send/...",
+    "keys": {
+        "p256dh": "key_here",
+        "auth": "auth_here"
+    }
+})
+
+# With provider
+subscriber.add_webpush(subscription_dict, provider="vapid")
+```
+
+**Parameters:**
+- `value` (dict): Web push subscription object
+- `provider` (str, optional): Push provider (e.g., "vapid")
+
+#### remove_webpush
+
+Remove a web push subscription.
+
+```python
+subscriber.remove_webpush(subscription_dict)
+```
+
+**Parameters:**
+- `value` (dict): Web push subscription object to remove
+- `provider` (str, optional): Push provider
+
+### Slack
+
+#### add_slack
+
+Add a Slack channel for notifications.
+
+```python
+subscriber.add_slack({
+    "access_token": "xoxb-...",
+    "channel_id": "C1234567890",
+    "user_id": "U1234567890"
+})
+```
+
+**Parameters:**
+- `value` (dict): Slack channel configuration
+
+#### remove_slack
+
+Remove a Slack channel.
+
+```python
+subscriber.remove_slack({
+    "channel_id": "C1234567890"
+})
+```
+
+**Parameters:**
+- `value` (dict): Slack channel identifier
+
+### Microsoft Teams
+
+#### add_ms_teams
+
+Add a Microsoft Teams channel for notifications.
+
+```python
+subscriber.add_ms_teams({
+    "webhook_url": "https://outlook.office.com/webhook/...",
+    "user_id": "user@company.com"
+})
+```
+
+**Parameters:**
+- `value` (dict): MS Teams channel configuration
+
+#### remove_ms_teams
+
+Remove a Microsoft Teams channel.
+
+```python
+subscriber.remove_ms_teams({
+    "user_id": "user@company.com"
+})
+```
+
+**Parameters:**
+- `value` (dict): MS Teams channel identifier
+
+## Saving Changes
+
+### save
+
+Save all changes to the user profile.
+
+```python
+subscriber = supr_client.user.get_instance("distinct_id")
+subscriber.add_email("user@example.com")
+subscriber.set("name", "John Doe")
+
+# Save all changes
+response = subscriber.save()
+
+if response["success"]:
+    print("User profile updated successfully")
+else:
+    print(f"Error: {response['message']}")
+```
+
+**Returns:**
+- `dict`: Response object with status information
+  - `success` (bool): Whether the operation succeeded
+  - `status` (str): "success" or "fail"
+  - `status_code` (int): HTTP status code
+  - `message` (str): Response message or error details
+
+## Validation
+
+### errors
+
+Get validation errors for the subscriber instance.
+
+```python
+errors = subscriber.errors
+if errors:
+    print(f"Validation errors: {errors}")
+```
+
+**Returns:**
+- `list[str]`: List of error messages
+
+### warnings
+
+Get validation warnings for the subscriber instance.
+
+```python
+warnings = subscriber.warnings
+if warnings:
+    print(f"Warnings: {warnings}")
+```
+
+**Returns:**
+- `list[str]`: List of warning messages
+
+## Complete Example
+
+```python
+from suprsend import Suprsend
+
+# Initialize client
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+# Get subscriber instance
+subscriber = supr_client.user.get_instance("user_123")
+
+# Set user properties
+subscriber.set({
+    "name": "John Doe",
+    "email": "john@example.com",
+    "plan": "premium"
+})
+
+# Set preferences
+subscriber.set_preferred_language("en")
+subscriber.set_timezone("America/New_York")
+
+# Add communication channels
+subscriber.add_email("john@example.com")
+subscriber.add_sms("+1234567890")
+subscriber.add_whatsapp("+1234567890")
+
+# Increment counters
+subscriber.increment("login_count", 1)
+
+# Append to list properties
+subscriber.append("tags", "vip")
+
+# Save all changes
+response = subscriber.save()
+
+if response["success"]:
+    print("User profile updated successfully")
+else:
+    print(f"Failed: {response['message']}")
+```

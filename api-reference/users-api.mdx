@@ -1,0 +1,393 @@
+---
+title: "UsersApi"
+description: "UsersApi class for advanced user profile management operations"
+---
+
+The `UsersApi` class provides advanced methods for managing user profiles, including listing users, getting user details, updating profiles, merging users, and managing subscriptions.
+
+## Initialization
+
+```python
+from suprsend import Suprsend
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+# Access users API
+users_api = supr_client.users
+```
+
+## User Operations
+
+### list
+
+List all users with optional filters.
+
+```python
+# List users with pagination
+response = users_api.list({
+    "limit": 20,
+    "offset": 0
+})
+
+print(response)
+```
+
+**Parameters:**
+- `options` (dict, optional): Query options
+  - `limit` (int): Number of records to return
+  - `offset` (int): Number of records to skip
+
+**Returns:**
+- `dict`: Response containing list of users
+
+**Raises:**
+- `SuprsendAPIException`: If the API request fails
+
+### get
+
+Get details of a specific user.
+
+```python
+user_data = users_api.get("distinct_id")
+print(user_data)
+```
+
+**Parameters:**
+- `distinct_id` (str): Unique identifier for the user
+
+**Returns:**
+- `dict`: User profile data
+
+**Raises:**
+- `SuprsendValidationError`: If distinct_id is invalid
+- `SuprsendAPIException`: If the API request fails
+
+### upsert
+
+Create or update a user profile.
+
+```python
+payload = {
+    "$set": {
+        "name": "John Doe",
+        "email": "john@example.com"
+    },
+    "$append": {
+        "tags": ["premium", "active"]
+    }
+}
+
+response = users_api.upsert("distinct_id", payload)
+```
+
+**Parameters:**
+- `distinct_id` (str): Unique identifier for the user
+- `payload` (dict, optional): User data to upsert
+
+**Returns:**
+- `dict`: Response from the API
+
+**Raises:**
+- `SuprsendValidationError`: If distinct_id is invalid
+- `SuprsendAPIException`: If the API request fails
+
+### edit
+
+Edit a user profile with specific operations.
+
+```python
+# Using UserEdit instance
+user_edit = users_api.get_edit_instance("distinct_id")
+user_edit.set("name", "Jane Doe")
+user_edit.add_email("jane@example.com")
+
+response = users_api.edit(user_edit)
+
+# Using distinct_id and payload directly
+payload = {
+    "$set": {"name": "Jane Doe"},
+    "$add": {"$email": ["jane@example.com"]}
+}
+
+response = users_api.edit("distinct_id", payload)
+```
+
+**Parameters:**
+- `edit_ins_or_distinct_id` (UserEdit | str): UserEdit instance or distinct_id string
+- `edit_payload` (dict, optional): Edit operations payload (required if first arg is string)
+
+**Returns:**
+- `dict`: Response from the API
+
+**Raises:**
+- `SuprsendValidationError`: If validation fails
+- `SuprsendAPIException`: If the API request fails
+
+### async_edit
+
+Perform asynchronous user profile edits (non-blocking).
+
+```python
+user_edit = users_api.get_edit_instance("distinct_id")
+user_edit.set("name", "John Doe")
+user_edit.add_email("john@example.com")
+user_edit.increment("login_count", 1)
+
+response = users_api.async_edit(user_edit)
+
+if response["success"]:
+    print("User edit queued successfully")
+```
+
+**Parameters:**
+- `edit_instance` (UserEdit): UserEdit instance with operations
+
+**Returns:**
+- `dict`: Response object
+  - `success` (bool): Whether the operation succeeded
+  - `status` (str): "success" or "fail"
+  - `status_code` (int): HTTP status code
+  - `message` (str): Response message
+
+**Raises:**
+- `SuprsendValidationError`: If edit_instance is invalid
+- `SuprsendAPIException`: If the API request fails
+
+### merge
+
+Merge two user profiles.
+
+```python
+# Merge from_user_id into distinct_id
+response = users_api.merge(
+    distinct_id="primary_user_id",
+    from_user_id="secondary_user_id"
+)
+
+print(response)
+```
+
+**Parameters:**
+- `distinct_id` (str): Primary user ID (target)
+- `from_user_id` (str): Secondary user ID (source) - will be merged into primary
+
+**Returns:**
+- `dict`: Response from the API
+
+**Raises:**
+- `SuprsendValidationError`: If distinct_id is invalid
+- `SuprsendAPIException`: If the API request fails
+
+### delete
+
+Delete a user profile.
+
+```python
+response = users_api.delete("distinct_id")
+
+if response["success"]:
+    print("User deleted successfully")
+```
+
+**Parameters:**
+- `distinct_id` (str): Unique identifier for the user
+
+**Returns:**
+- `dict`: Response object
+  - `success` (bool): True if deletion succeeded
+  - `status_code` (int): HTTP status code
+
+**Raises:**
+- `SuprsendValidationError`: If distinct_id is invalid
+- `SuprsendAPIException`: If the API request fails
+
+### bulk_delete
+
+Delete multiple users in a single operation.
+
+```python
+payload = {
+    "distinct_ids": ["user_1", "user_2", "user_3"]
+}
+
+response = users_api.bulk_delete(payload)
+
+if response["success"]:
+    print("Users deleted successfully")
+```
+
+**Parameters:**
+- `payload` (dict): Payload containing list of user IDs
+  - `distinct_ids` (list[str]): List of user IDs to delete
+
+**Returns:**
+- `dict`: Response object
+  - `success` (bool): True if deletion succeeded
+  - `status_code` (int): HTTP status code
+
+**Raises:**
+- `SuprsendAPIException`: If the API request fails
+
+## Subscription Management
+
+### get_objects_subscribed_to
+
+Get list of objects (workflows/topics) a user is subscribed to.
+
+```python
+# Get subscribed objects with pagination
+response = users_api.get_objects_subscribed_to(
+    "distinct_id",
+    options={"limit": 20, "offset": 0}
+)
+
+for obj in response.get("objects", []):
+    print(f"Subscribed to: {obj['id']}")
+```
+
+**Parameters:**
+- `distinct_id` (str): Unique identifier for the user
+- `options` (dict, optional): Query options
+  - `limit` (int): Number of records to return
+  - `offset` (int): Number of records to skip
+
+**Returns:**
+- `dict`: Response containing subscribed objects
+
+**Raises:**
+- `SuprsendValidationError`: If distinct_id is invalid
+- `SuprsendAPIException`: If the API request fails
+
+### get_lists_subscribed_to
+
+Get list of subscriber lists a user is subscribed to.
+
+```python
+# Get subscribed lists
+response = users_api.get_lists_subscribed_to(
+    "distinct_id",
+    options={"limit": 20, "offset": 0}
+)
+
+for lst in response.get("lists", []):
+    print(f"Subscribed to list: {lst['id']}")
+```
+
+**Parameters:**
+- `distinct_id` (str): Unique identifier for the user
+- `options` (dict, optional): Query options
+  - `limit` (int): Number of records to return
+  - `offset` (int): Number of records to skip
+
+**Returns:**
+- `dict`: Response containing subscribed lists
+
+**Raises:**
+- `SuprsendValidationError`: If distinct_id is invalid
+- `SuprsendAPIException`: If the API request fails
+
+## Helper Methods
+
+### get_edit_instance
+
+Get a UserEdit instance for building user edit operations.
+
+```python
+user_edit = users_api.get_edit_instance("distinct_id")
+
+# Add operations
+user_edit.set("name", "John Doe")
+user_edit.add_email("john@example.com")
+user_edit.increment("login_count", 1)
+
+# Execute the edit
+response = users_api.edit(user_edit)
+```
+
+**Parameters:**
+- `distinct_id` (str): Unique identifier for the user
+
+**Returns:**
+- `UserEdit`: UserEdit instance for the specified user
+
+**Raises:**
+- `SuprsendValidationError`: If distinct_id is invalid
+
+### get_bulk_edit_instance
+
+Get a BulkUsersEdit instance for editing multiple users.
+
+```python
+bulk_edit = users_api.get_bulk_edit_instance()
+
+# Create multiple user edits
+for user_id in ["user_1", "user_2", "user_3"]:
+    user_edit = users_api.get_edit_instance(user_id)
+    user_edit.set("status", "active")
+    user_edit.increment("login_count", 1)
+    bulk_edit.append(user_edit)
+
+# Save all edits
+response = bulk_edit.save()
+```
+
+**Returns:**
+- `BulkUsersEdit`: BulkUsersEdit instance for batch operations
+
+## Complete Example
+
+```python
+from suprsend import Suprsend
+
+# Initialize client
+supr_client = Suprsend("workspace_key", "workspace_secret")
+users_api = supr_client.users
+
+# Get user details
+try:
+    user = users_api.get("user_123")
+    print(f"User: {user}")
+except Exception as e:
+    print(f"Error: {e}")
+
+# Update user using UserEdit
+user_edit = users_api.get_edit_instance("user_123")
+user_edit.set({
+    "name": "John Doe",
+    "plan": "premium"
+})
+user_edit.add_email("john@example.com")
+user_edit.increment("login_count", 1)
+
+# Save edits (synchronous)
+response = users_api.edit(user_edit)
+print(f"Edit response: {response}")
+
+# Or save edits asynchronously
+response = users_api.async_edit(user_edit)
+if response["success"]:
+    print("User edit queued successfully")
+
+# Merge users
+merge_response = users_api.merge(
+    distinct_id="primary_user",
+    from_user_id="duplicate_user"
+)
+print(f"Merge response: {merge_response}")
+
+# Get subscriptions
+subscriptions = users_api.get_objects_subscribed_to("user_123")
+print(f"Subscribed to: {subscriptions}")
+
+# Delete user
+delete_response = users_api.delete("user_123")
+if delete_response["success"]:
+    print("User deleted successfully")
+
+# Bulk delete users
+bulk_delete_response = users_api.bulk_delete({
+    "distinct_ids": ["user_1", "user_2", "user_3"]
+})
+if bulk_delete_response["success"]:
+    print("Users deleted successfully")
+```

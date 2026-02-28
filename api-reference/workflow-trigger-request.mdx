@@ -1,0 +1,196 @@
+---
+title: "WorkflowTriggerRequest"
+description: "Class for creating workflow trigger requests with support for attachments and metadata"
+---
+
+## Overview
+
+The `WorkflowTriggerRequest` class represents a single workflow trigger request. It encapsulates the workflow body along with optional metadata like idempotency key, tenant ID, and cancellation key.
+
+## Constructor
+
+```python
+WorkflowTriggerRequest(
+    body: dict,
+    idempotency_key: str = None,
+    tenant_id: str = None,
+    cancellation_key: str = None
+)
+```
+
+### Parameters
+
+<ParamField path="body" type="dict" required>
+  The workflow trigger body containing workflow configuration and data. Must be a dictionary/JSON object.
+</ParamField>
+
+<ParamField path="idempotency_key" type="str" optional>
+  Unique key to ensure idempotent workflow execution. Prevents duplicate workflow triggers with the same key.
+</ParamField>
+
+<ParamField path="tenant_id" type="str" optional>
+  Tenant identifier for multi-tenant applications. Associates the workflow with a specific tenant.
+</ParamField>
+
+<ParamField path="cancellation_key" type="str" optional>
+  Unique key that can be used to cancel the workflow execution later.
+</ParamField>
+
+### Example
+
+```python
+from suprsend import WorkflowTriggerRequest
+
+# Basic workflow trigger
+workflow = WorkflowTriggerRequest(
+    body={
+        "workflow": "welcome_email",
+        "recipients": [
+            {
+                "distinct_id": "user_123",
+                "$email": ["user@example.com"]
+            }
+        ],
+        "data": {
+            "name": "John Doe",
+            "signup_date": "2024-01-15"
+        }
+    },
+    idempotency_key="welcome_email_user_123",
+    tenant_id="tenant_001"
+)
+```
+
+## Methods
+
+### add_attachment()
+
+Adds file attachments to the workflow trigger request.
+
+```python
+add_attachment(
+    file_path: str,
+    file_name: str = None,
+    ignore_if_error: bool = False
+)
+```
+
+#### Parameters
+
+<ParamField path="file_path" type="str" required>
+  Path to the file to attach. Must be a valid file path accessible by the application.
+</ParamField>
+
+<ParamField path="file_name" type="str" optional>
+  Optional custom name for the attachment. If not provided, the original filename will be used.
+</ParamField>
+
+<ParamField path="ignore_if_error" type="bool" default="False">
+  If True, silently ignores errors when reading or attaching the file. If False, raises an exception on error.
+</ParamField>
+
+#### Example
+
+```python
+workflow = WorkflowTriggerRequest(body={
+    "workflow": "invoice_email",
+    "recipients": [{"distinct_id": "user_123"}],
+    "data": {"invoice_number": "INV-001"}
+})
+
+# Add attachment
+workflow.add_attachment(
+    file_path="/path/to/invoice.pdf",
+    file_name="Invoice_INV-001.pdf"
+)
+```
+
+#### Notes
+
+- Attachments are stored in `body["data"]["$attachments"]` as an array
+- Multiple attachments can be added by calling this method multiple times
+- If `body["data"]` is not a dictionary, a warning is logged and the attachment is not added
+- The file is read and encoded for transmission
+
+### as_json()
+
+Returns the workflow request as a JSON-serializable dictionary.
+
+```python
+as_json() -> dict
+```
+
+#### Returns
+
+<ResponseField name="dict" type="dict">
+  Dictionary representation of the workflow request including body and all metadata fields.
+</ResponseField>
+
+#### Example
+
+```python
+workflow = WorkflowTriggerRequest(
+    body={"workflow": "test"},
+    idempotency_key="key_123"
+)
+
+workflow_dict = workflow.as_json()
+print(workflow_dict)
+# Output: {"workflow": "test", "$idempotency_key": "key_123"}
+```
+
+### get_final_json()
+
+Internal method used by the SDK to validate and prepare the workflow body before sending.
+
+```python
+get_final_json(
+    config,
+    is_part_of_bulk: bool = False
+) -> tuple[dict, int]
+```
+
+#### Parameters
+
+<ParamField path="config" type="object" required>
+  SDK configuration object containing workspace credentials and settings.
+</ParamField>
+
+<ParamField path="is_part_of_bulk" type="bool" default="False">
+  Indicates if this workflow is part of a bulk operation. Affects size validation.
+</ParamField>
+
+#### Returns
+
+<ResponseField name="body" type="dict">
+  Validated and finalized workflow body ready for API submission.
+</ResponseField>
+
+<ResponseField name="apparent_size" type="int">
+  Apparent size of the workflow body in bytes.
+</ResponseField>
+
+#### Raises
+
+- `InputValueError`: If the workflow body exceeds the maximum allowed size or fails schema validation
+
+## Body Size Limits
+
+Workflow trigger requests have size limitations:
+
+- Maximum apparent body size: **100 KB** (102,400 bytes)
+- Size includes the JSON body and any attachments
+- Requests exceeding this limit will raise an `InputValueError`
+
+## Best Practices
+
+1. **Use Idempotency Keys**: Always provide an idempotency key for production workflows to prevent duplicate executions
+2. **Validate Body Structure**: Ensure the body contains all required fields (`workflow`, `recipients`, etc.)
+3. **Handle Attachments Carefully**: Be mindful of file sizes when adding attachments to stay within the 100KB limit
+4. **Tenant Isolation**: Use `tenant_id` in multi-tenant applications to maintain proper data isolation
+5. **Error Handling**: Wrap workflow creation in try-except blocks to catch `InputValueError` exceptions
+
+## Related
+
+- [WorkflowsApi](/api-reference/workflows-api) - Trigger individual workflows
+- [Bulk Workflows](/api-reference/bulk-workflows) - Trigger multiple workflows efficiently

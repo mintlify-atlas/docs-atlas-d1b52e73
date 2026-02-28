@@ -1,80 +1,420 @@
 ---
 title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+description: "Get started with SuprSend Python SDK in 5 minutes"
 ---
 
-## Get started in three steps
+## Overview
 
-Get your documentation site running locally and make your first customization.
+This guide walks you through sending your first notification using the SuprSend Python SDK. You'll learn how to:
 
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+- Initialize the SDK
+- Create a workflow trigger request
+- Send a notification to a user
+- Handle the response
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  Before starting, make sure you've [installed the SDK](/installation) and have your workspace credentials ready.
 </Note>
+
+## Step 1: Initialize the SDK
+
+First, import and initialize the SuprSend client with your workspace credentials:
+
+```python
+from suprsend import Suprsend
+
+# Initialize SDK
+supr_client = Suprsend(
+    workspace_key="your_workspace_key",
+    workspace_secret="your_workspace_secret"
+)
+```
+
+<Tip>
+  Store your credentials in environment variables for better security:
+  
+  ```python
+  import os
+  
+  supr_client = Suprsend(
+      workspace_key=os.environ.get("SUPRSEND_WORKSPACE_KEY"),
+      workspace_secret=os.environ.get("SUPRSEND_WORKSPACE_SECRET")
+  )
+  ```
+</Tip>
+
+## Step 2: Trigger Your First Workflow
+
+A workflow is a pre-configured notification template in your SuprSend dashboard. Let's trigger a workflow to send a notification:
+
+```python
+from suprsend import WorkflowTriggerRequest
+
+# Prepare workflow request
+wf = WorkflowTriggerRequest(
+    body={
+        "workflow": "purchase-made",  # Your workflow slug
+        "recipients": [
+            {
+                "distinct_id": "0f988f74-6982-41c5-8752-facb6911fb08",
+                "$email": ["user@example.com"],
+                "$androidpush": [
+                    {
+                        "token": "__android_push_token__",
+                        "provider": "fcm",
+                        "device_id": ""
+                    }
+                ],
+            }
+        ],
+        "data": {
+            "first_name": "User",
+            "spend_amount": "$10",
+            "nested_key_example": {
+                "nested_key1": "some_value_1",
+                "nested_key2": {
+                    "nested_key3": "some_value_3",
+                },
+            }
+        }
+    }
+)
+
+# Trigger workflow
+response = supr_client.workflows.trigger(wf)
+print(response)
+```
+
+<Steps>
+  <Step title="workflow">
+    The workflow slug from your SuprSend dashboard (e.g., "purchase-made", "welcome-email").
+  </Step>
+  
+  <Step title="recipients">
+    An array of recipient objects. Each recipient needs:
+    - `distinct_id` - Unique user identifier
+    - Channel details (e.g., `$email`, `$sms`, `$androidpush`)
+  </Step>
+  
+  <Step title="data">
+    Dynamic data to populate your notification template. Can include any JSON-serializable values.
+  </Step>
+</Steps>
+
+### Understanding the Response
+
+When successful, you'll receive:
+
+```python
+{
+    "success": True,
+    "status": "success",
+    "status_code": 202,
+    "message": "Message received",
+}
+```
+
+If there's an error:
+
+```python
+{
+    "success": False,
+    "status": "fail",
+    "status_code": 400,  # or 500
+    "message": "error message",
+}
+```
+
+<Info>
+  The workflow execution happens asynchronously. A `202` response means your request was accepted and will be processed.
+</Info>
+
+## Step 3: Add User Channels to Profile (Optional)
+
+Instead of passing channel details in every workflow request, you can set them once in the user's profile:
+
+```python
+# Get user instance
+user = supr_client.user.get_instance(distinct_id="user_123")
+
+# Add channel details
+user.add_email("user@example.com")
+user.add_sms("+919999999999")
+user.add_whatsapp("+919999999999")
+user.add_androidpush("__android_push_fcm_token__")
+user.add_iospush("__iospush_token__")
+
+# Add Slack channel
+user.add_slack({
+    "email": "user@example.com",
+    "access_token": "xoxb-XXXXXXXXXXXX"
+})
+
+# Add MS Teams channel
+user.add_ms_teams({
+    "tenant_id": "XXXXXXX",
+    "service_url": "https://smba.trafficmanager.net/XXXXXXXXXX",
+    "conversation_id": "XXXXXXXXXXXX"
+})
+
+# Save changes
+response = user.save()
+print(response)
+```
+
+Now you can trigger workflows with just the `distinct_id`:
+
+```python
+wf = WorkflowTriggerRequest(
+    body={
+        "workflow": "purchase-made",
+        "recipients": [
+            {
+                "distinct_id": "user_123",  # Channels auto-picked from profile
+            }
+        ],
+        "data": {
+            "first_name": "User",
+            "spend_amount": "$10",
+        }
+    }
+)
+
+response = supr_client.workflows.trigger(wf)
+```
+
+## Step 4: Track User Events (Optional)
+
+Track user events to trigger automated workflows or build user segments:
+
+```python
+from suprsend import Event
+
+# Create event
+event = Event(
+    distinct_id="user_123",
+    event_name="product_purchased",
+    properties={
+        "product_id": "prod_123",
+        "amount": 99.99,
+        "currency": "USD",
+        "category": "Electronics"
+    }
+)
+
+# Track event
+response = supr_client.track_event(event)
+print(response)
+```
+
+<Warning>
+  Event names starting with `$` or `ss_` are reserved by SuprSend and cannot be used for custom events.
+</Warning>
+
+## Advanced Features
+
+### Add Idempotency Key
+
+Prevent duplicate notifications by adding an idempotency key:
+
+```python
+wf = WorkflowTriggerRequest(
+    body={...},
+    idempotency_key="order_12345"
+)
+
+response = supr_client.workflows.trigger(wf)
+```
+
+<Info>
+  SuprSend will skip processing requests with the same idempotency key for 24 hours.
+</Info>
+
+### Add Tenant ID
+
+For multi-tenant applications, specify which tenant's templates to use:
+
+```python
+wf = WorkflowTriggerRequest(
+    body={...},
+    tenant_id="tenant_abc"
+)
+
+response = supr_client.workflows.trigger(wf)
+```
+
+### Add File Attachments
+
+Attach files to notifications (e.g., PDF invoices to emails):
+
+```python
+wf = WorkflowTriggerRequest(
+    body={
+        "workflow": "invoice-sent",
+        "recipients": [{...}],
+        "data": {...}
+    }
+)
+
+# Add attachment
+wf.add_attachment("/home/user/billing.pdf")
+
+# Trigger with attachment
+response = supr_client.workflows.trigger(wf)
+```
+
+<Tip>
+  The SDK automatically:
+  - Detects the MIME type
+  - Base64 encodes the file content
+  - Validates the total request size (max 800KB)
+</Tip>
+
+### Limit Channels
+
+Send to specific channels only:
+
+```python
+wf = WorkflowTriggerRequest(
+    body={
+        "workflow": "purchase-made",
+        "recipients": [
+            {
+                "distinct_id": "user_123",
+                "$channels": ["email"],  # Only send email, skip other channels
+                "$email": ["user@example.com"],
+            }
+        ],
+        "data": {...}
+    }
+)
+```
+
+## Complete Example
+
+Here's a complete example putting it all together:
+
+```python
+import os
+from suprsend import Suprsend, WorkflowTriggerRequest, Event
+
+# Initialize client
+supr_client = Suprsend(
+    workspace_key=os.environ.get("SUPRSEND_WORKSPACE_KEY"),
+    workspace_secret=os.environ.get("SUPRSEND_WORKSPACE_SECRET")
+)
+
+# 1. Set up user profile
+user = supr_client.user.get_instance("user_123")
+user.add_email("user@example.com")
+user.add_sms("+1234567890")
+user.set_preferred_language("en")
+user.set_timezone("America/New_York")
+user.save()
+
+# 2. Track an event
+event = Event(
+    distinct_id="user_123",
+    event_name="product_purchased",
+    properties={
+        "product_id": "prod_123",
+        "amount": 99.99
+    }
+)
+supr_client.track_event(event)
+
+# 3. Trigger a workflow
+wf = WorkflowTriggerRequest(
+    body={
+        "workflow": "purchase-confirmation",
+        "recipients": [{"distinct_id": "user_123"}],
+        "data": {
+            "order_id": "#12345",
+            "amount": "$99.99",
+            "product_name": "Wireless Headphones"
+        }
+    },
+    idempotency_key="order_12345"
+)
+
+response = supr_client.workflows.trigger(wf)
+
+if response["success"]:
+    print("Notification sent successfully!")
+else:
+    print(f"Error: {response['message']}")
+```
+
+## Size Limits
+
+<Warning>
+  Keep these limits in mind:
+  - Maximum workflow body size: **800KB** (800 × 1024 bytes)
+  - Idempotency key maximum length: **64 characters**
+  - Exceeding size limits will raise a `ValueError`
+</Warning>
+
+## Error Handling
+
+Handle errors gracefully in your application:
+
+```python
+try:
+    response = supr_client.workflows.trigger(wf)
+    
+    if response["success"]:
+        print("Success:", response["message"])
+    else:
+        print(f"API Error: {response['message']} (Status: {response['status_code']})")
+        
+except ValueError as e:
+    print(f"Validation Error: {e}")
+except Exception as e:
+    print(f"Unexpected Error: {e}")
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Core Concepts"
+    icon="book"
+    href="/core-concepts/workflows"
+  >
+    Learn about workflows, users, events, and channels
+  </Card>
+  
+  <Card
+    title="User Management"
+    icon="users"
+    href="/users/managing-users"
+  >
+    Deep dive into user profile management
+  </Card>
+  
+  <Card
+    title="Bulk Operations"
+    icon="layer-group"
+    href="/workflows/bulk-workflows"
+  >
+    Send notifications to multiple users efficiently
+  </Card>
+  
+  <Card
+    title="Best Practices"
+    icon="star"
+    href="/guides/best-practices"
+  >
+    Learn best practices for production use
+  </Card>
+</CardGroup>
+
+## Need Help?
+
+<Card
+  title="View Full API Reference"
+  icon="code"
+  href="/api-reference/suprsend"
+>
+  Explore detailed API documentation and all available methods.
+</Card>

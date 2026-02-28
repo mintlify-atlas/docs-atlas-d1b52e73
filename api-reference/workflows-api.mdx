@@ -1,0 +1,249 @@
+---
+title: "WorkflowsApi"
+description: "API class for triggering individual workflows and creating bulk workflow instances"
+---
+
+## Overview
+
+The `WorkflowsApi` class provides methods to trigger individual workflow requests and create bulk workflow instances. It handles authentication, request signing, and HTTP communication with the SuprSend API.
+
+## Constructor
+
+```python
+WorkflowsApi(config)
+```
+
+### Parameters
+
+<ParamField path="config" type="object" required>
+  SDK configuration object containing workspace credentials, base URL, and user agent settings.
+</ParamField>
+
+<Note>
+You typically don't instantiate this class directly. It's created automatically when you initialize the SuprSend client and is accessible via `supr_client.workflows`.
+</Note>
+
+### Example
+
+```python
+from suprsend import Suprsend
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+# Access WorkflowsApi instance
+workflows_api = supr_client.workflows
+```
+
+## Methods
+
+### trigger()
+
+Triggers a single workflow request.
+
+```python
+trigger(workflow: WorkflowTriggerRequest) -> dict
+```
+
+#### Parameters
+
+<ParamField path="workflow" type="WorkflowTriggerRequest" required>
+  A WorkflowTriggerRequest instance containing the workflow configuration and data.
+</ParamField>
+
+#### Returns
+
+<ResponseField name="success" type="bool">
+  Indicates whether the workflow trigger was successful.
+</ResponseField>
+
+<ResponseField name="status" type="str">
+  Status of the operation: `"success"` or `"fail"`.
+</ResponseField>
+
+<ResponseField name="status_code" type="int">
+  HTTP status code from the API response.
+</ResponseField>
+
+<ResponseField name="message" type="str">
+  Success message (usually message_id) or error message.
+</ResponseField>
+
+<ResponseField name="raw_response" type="dict | None">
+  Complete API response as JSON, or None if the response couldn't be parsed.
+</ResponseField>
+
+#### Example
+
+```python
+from suprsend import Suprsend, WorkflowTriggerRequest
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+# Create workflow request
+workflow = WorkflowTriggerRequest(
+    body={
+        "workflow": "purchase_confirmation",
+        "recipients": [
+            {
+                "distinct_id": "user_456",
+                "$email": ["customer@example.com"],
+                "$sms": ["+1234567890"]
+            }
+        ],
+        "data": {
+            "order_id": "ORD-12345",
+            "total": "$99.99",
+            "items_count": 3
+        }
+    },
+    idempotency_key="order_ORD-12345_confirmation"
+)
+
+# Trigger workflow
+response = supr_client.workflows.trigger(workflow)
+
+if response["success"]:
+    print(f"Workflow triggered successfully: {response['message']}")
+else:
+    print(f"Failed to trigger workflow: {response['message']}")
+```
+
+#### Response Examples
+
+**Success Response:**
+
+```python
+{
+    "success": True,
+    "status": "success",
+    "status_code": 202,
+    "message": "msg_abc123xyz",
+    "raw_response": {
+        "message_id": "msg_abc123xyz"
+    }
+}
+```
+
+**Error Response:**
+
+```python
+{
+    "success": False,
+    "status": "fail",
+    "status_code": 400,
+    "message": "Invalid workflow body",
+    "raw_response": {
+        "error": {
+            "message": "Invalid workflow body",
+            "details": "Missing required field: workflow"
+        }
+    }
+}
+```
+
+**Network Error Response:**
+
+```python
+{
+    "success": False,
+    "status": "fail",
+    "status_code": 500,
+    "message": "Connection timeout",
+    "raw_response": None
+}
+```
+
+### bulk_trigger_instance()
+
+Creates a new bulk workflow trigger instance for efficiently triggering multiple workflows.
+
+```python
+bulk_trigger_instance() -> BulkWorkflowTrigger
+```
+
+#### Returns
+
+<ResponseField name="BulkWorkflowTrigger" type="BulkWorkflowTrigger">
+  A new instance of BulkWorkflowTrigger for batching multiple workflow triggers.
+</ResponseField>
+
+#### Example
+
+```python
+from suprsend import Suprsend, WorkflowTriggerRequest
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+# Create bulk instance
+bulk_instance = supr_client.workflows.bulk_trigger_instance()
+
+# Append workflows one by one
+for i in range(10):
+    workflow = WorkflowTriggerRequest(
+        body={
+            "workflow": "daily_digest",
+            "recipients": [{"distinct_id": f"user_{i}"}],
+            "data": {"user_id": i}
+        }
+    )
+    bulk_instance.append(workflow)
+
+# Or append multiple workflows at once
+workflows = [workflow1, workflow2, workflow3]
+bulk_instance.append(*workflows)
+
+# Trigger all workflows
+response = bulk_instance.trigger()
+print(f"Total: {response.total}, Success: {response.success}, Failed: {response.failure}")
+```
+
+#### Usage Notes
+
+- Use bulk triggering when you need to send multiple workflows
+- More efficient than calling `trigger()` multiple times
+- Automatically handles batching and chunking of requests
+- Returns a consolidated response for all workflows
+
+## Authentication
+
+The `WorkflowsApi` class automatically handles:
+
+- Request signing using HMAC-SHA256
+- Authorization header generation
+- Workspace key and secret management
+- Date header formatting
+
+You don't need to manually set authentication headers.
+
+## Error Handling
+
+The `trigger()` method always returns a response dictionary, even on network errors:
+
+```python
+response = supr_client.workflows.trigger(workflow)
+
+if not response["success"]:
+    status_code = response["status_code"]
+    
+    if status_code == 400:
+        print(f"Bad request: {response['message']}")
+    elif status_code == 401:
+        print("Authentication failed")
+    elif status_code == 500:
+        print(f"Server or network error: {response['message']}")
+    else:
+        print(f"Unexpected error: {response['message']}")
+```
+
+## Best Practices
+
+1. **Check Response Success**: Always check the `success` field in the response before proceeding
+2. **Use Bulk for Multiple Workflows**: If triggering more than 2-3 workflows, use `bulk_trigger_instance()` for better performance
+3. **Handle Network Errors**: Implement retry logic for 500-level errors and network failures
+4. **Log Response Details**: Store `raw_response` for debugging and audit trails
+5. **Idempotency**: Use idempotency keys in production to safely retry failed requests
+
+## Related
+
+- [WorkflowTriggerRequest](/api-reference/workflow-trigger-request) - Create workflow trigger requests
+- [Bulk Workflows](/api-reference/bulk-workflows) - Efficient bulk workflow operations

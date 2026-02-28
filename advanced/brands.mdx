@@ -1,0 +1,203 @@
+---
+title: Brand management
+description: Manage multiple brands for white-labeling and customization
+icon: palette
+---
+
+Brands in SuprSend allow you to white-label notifications and customize the sender identity for different products, sub-brands, or customer segments.
+
+## Overview
+
+Brands enable you to:
+
+- Customize sender names and email addresses
+- Use different logos and brand colors
+- Support white-labeling for multi-product offerings
+- Maintain consistent branding across channels
+
+## BrandsApi class
+
+Access brand operations through the `supr_client.brands` property:
+
+```python
+from suprsend import Suprsend
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+brands_api = supr_client.brands
+```
+
+## List brands
+
+Retrieve all brands with pagination:
+
+```python
+# Get first 20 brands
+response = supr_client.brands.list()
+
+# Get brands with custom pagination
+response = supr_client.brands.list(limit=50, offset=0)
+```
+
+**Parameters:**
+- `limit` (int, optional): Number of brands to return (1-1000, default: 20)
+- `offset` (int, optional): Number of brands to skip (default: 0)
+
+## Get brand details
+
+Retrieve information about a specific brand:
+
+```python
+brand_id = "primary-brand"
+response = supr_client.brands.get(brand_id)
+```
+
+**Parameters:**
+- `brand_id` (str, required): Unique identifier for the brand
+
+## Create or update brand
+
+Create a new brand or update an existing one:
+
+```python
+brand_id = "primary-brand"
+brand_payload = {
+    "brand_name": "Acme Products",
+    "from_name": "Acme Team",
+    "from_email": "notifications@acme.com",
+    "reply_to_email": "support@acme.com",
+    "logo_url": "https://acme.com/logo.png",
+    "primary_color": "#FF5733"
+}
+
+response = supr_client.brands.upsert(brand_id, brand_payload)
+```
+
+**Parameters:**
+- `brand_id` (str, required): Unique identifier for the brand
+- `brand_payload` (dict, required): Brand configuration data
+
+<Note>
+Brand payload fields may vary based on your SuprSend workspace configuration. Check with your SuprSend dashboard for available options.
+</Note>
+
+## Using brands with workflows
+
+Specify a brand when triggering workflows:
+
+```python
+from suprsend import WorkflowTriggerRequest
+
+wf = WorkflowTriggerRequest(
+    body={
+        "workflow": "order_confirmation",
+        "recipients": [{"distinct_id": "user123"}],
+        "data": {"order_id": "12345"}
+    },
+    brand_id="primary-brand"
+)
+
+response = supr_client.workflows.trigger(wf)
+```
+
+## Using brands with events
+
+Track events associated with a brand:
+
+```python
+from suprsend import Event
+
+event = Event(
+    distinct_id="user123",
+    event_name="product_viewed",
+    properties={"product_id": "SKU-789"},
+    brand_id="primary-brand"
+)
+
+response = supr_client.track_event(event)
+```
+
+## Multi-brand workflow example
+
+Here's an example of using different brands for different products:
+
+```python
+from suprsend import WorkflowTriggerRequest
+
+# Brand for Product A
+wf_product_a = WorkflowTriggerRequest(
+    body={
+        "workflow": "welcome",
+        "recipients": [{"distinct_id": "user123"}]
+    },
+    brand_id="product-a-brand"
+)
+supr_client.workflows.trigger(wf_product_a)
+
+# Brand for Product B
+wf_product_b = WorkflowTriggerRequest(
+    body={
+        "workflow": "welcome",
+        "recipients": [{"distinct_id": "user456"}]
+    },
+    brand_id="product-b-brand"
+)
+supr_client.workflows.trigger(wf_product_b)
+```
+
+## Combining tenants and brands
+
+You can use both `tenant_id` and `brand_id` together:
+
+```python
+from suprsend import WorkflowTriggerRequest
+
+wf = WorkflowTriggerRequest(
+    body={
+        "workflow": "invoice_generated",
+        "recipients": [{"distinct_id": "user123"}]
+    },
+    tenant_id="enterprise-org-123",
+    brand_id="enterprise-brand"
+)
+
+response = supr_client.workflows.trigger(wf)
+```
+
+## Error handling
+
+```python
+from suprsend import SuprsendAPIException
+
+try:
+    response = supr_client.brands.get("non-existent-brand")
+except SuprsendAPIException as e:
+    print(f"API error: {e.status_code} - {e.message}")
+```
+
+## Best practices
+
+<CardGroup cols={2}>
+  <Card title="Consistent branding" icon="check">
+    Use brand configurations consistently across all notification channels
+  </Card>
+  <Card title="Testing" icon="flask">
+    Test brand configurations before using them in production workflows
+  </Card>
+  <Card title="Fallback" icon="shield-halved">
+    Have a default brand configured for workflows that don't specify a brand
+  </Card>
+  <Card title="Documentation" icon="book">
+    Document which brand is used for which product or customer segment
+  </Card>
+</CardGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Tenants" icon="users" href="/advanced/tenants">
+    Learn about multi-tenancy support
+  </Card>
+  <Card title="BrandsApi reference" icon="code" href="/api-reference/brands">
+    View complete API reference
+  </Card>
+</CardGroup>

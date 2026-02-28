@@ -1,0 +1,259 @@
+---
+title: 'SubscriberListBroadcast'
+description: 'Create and manage broadcast messages for subscriber lists'
+---
+
+## Overview
+
+The `SubscriberListBroadcast` class represents a broadcast message that can be sent to all subscribers in a list. It allows you to configure the message content, add attachments, and set additional parameters like idempotency key, tenant ID, and brand ID.
+
+## Initialization
+
+Create a new broadcast instance with a message body:
+
+```python
+from suprsend import SubscriberListBroadcast
+
+broadcast = SubscriberListBroadcast(
+    body={"list_id": "weekly_newsletter", "template": "weekly_digest"},
+    idempotency_key="unique_key_123",
+    tenant_id="tenant_001",
+    brand_id="brand_001"
+)
+```
+
+### Constructor Parameters
+
+- `body` (dict, required): Dictionary containing the broadcast message details
+- `idempotency_key` (str, optional): Unique key to prevent duplicate broadcasts
+- `tenant_id` (str, optional): Tenant identifier for multi-tenant setups
+- `brand_id` (str, optional): Brand identifier for multi-brand setups
+
+**Raises:**
+- `InputValueError`: If body is not a dictionary
+
+---
+
+## Methods
+
+### add_attachment
+
+Add a file attachment to the broadcast message.
+
+```python
+add_attachment(
+    file_path: str,
+    file_name: str = None,
+    ignore_if_error: bool = False
+) -> None
+```
+
+**Parameters:**
+- `file_path` (str): Path to the file to attach
+- `file_name` (str, optional): Custom name for the attachment. If not provided, uses the original file name
+- `ignore_if_error` (bool, optional): If True, silently ignore errors when adding attachment. Default: False
+
+**Returns:**
+- None
+
+**Example:**
+```python
+broadcast = SubscriberListBroadcast({
+    "list_id": "weekly_newsletter",
+    "template": "weekly_digest",
+    "notification_category": "transactional"
+})
+
+# Add a single attachment
+broadcast.add_attachment("/path/to/report.pdf", "Weekly_Report.pdf")
+
+# Add multiple attachments
+broadcast.add_attachment("/path/to/image.png", "header_image.png")
+broadcast.add_attachment("/path/to/data.csv", ignore_if_error=True)
+```
+
+**Notes:**
+- Attachments are stored in `body["data"]["$attachments"]`
+- If `body["data"]` is not a dictionary, a warning is logged and the attachment is not added
+- The attachment file is automatically encoded and prepared for transmission
+
+---
+
+### get_final_json
+
+Prepare the final broadcast payload with all required fields and validation.
+
+```python
+get_final_json() -> tuple[Dict, int]
+```
+
+**Returns:**
+- tuple: A tuple containing:
+  - Dict: The final broadcast body with all fields populated
+  - int: Apparent size of the body in bytes
+
+**Example:**
+```python
+broadcast = SubscriberListBroadcast({
+    "list_id": "weekly_newsletter",
+    "template": "weekly_digest"
+})
+
+body, size = broadcast.get_final_json()
+print(f"Broadcast size: {size} bytes")
+```
+
+**Behavior:**
+- Adds `$insert_id` (UUID v4) to ensure uniqueness
+- Adds `$time` (current timestamp in milliseconds)
+- Adds `$idempotency_key` if provided during initialization
+- Adds `tenant_id` if provided during initialization
+- Adds `brand_id` if provided during initialization
+- Validates the body schema
+- Checks body size against the maximum allowed size (100 KB)
+
+**Raises:**
+- `InputValueError`: If the broadcast body exceeds the maximum size limit
+- `SuprsendValidationError`: If the body schema validation fails
+
+---
+
+### as_json
+
+Get the broadcast data as a JSON-serializable dictionary.
+
+```python
+as_json() -> Dict
+```
+
+**Returns:**
+- Dict: Dictionary representation of the broadcast
+
+**Example:**
+```python
+broadcast = SubscriberListBroadcast(
+    body={"list_id": "weekly_newsletter", "template": "weekly_digest"},
+    idempotency_key="unique_key_123"
+)
+
+json_data = broadcast.as_json()
+print(json_data)
+# Output includes body contents plus idempotency_key, tenant_id, brand_id if set
+```
+
+**Notes:**
+- Returns a copy of the body with additional metadata
+- Includes `$idempotency_key`, `tenant_id`, and `brand_id` if they were set
+- Does not include auto-generated fields like `$insert_id` and `$time` (use `get_final_json()` for those)
+
+---
+
+## Complete Example
+
+```python
+from suprsend import Suprsend, SubscriberListBroadcast
+
+# Initialize the client
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+# Create a broadcast message
+broadcast = SubscriberListBroadcast(
+    body={
+        "list_id": "weekly_newsletter",
+        "template": "weekly_digest",
+        "notification_category": "transactional",
+        "data": {
+            "header": "This Week's Highlights",
+            "content": "Check out our latest updates and features",
+            "cta_text": "Read More",
+            "cta_url": "https://example.com/weekly-digest"
+        }
+    },
+    idempotency_key="weekly_digest_2024_w12",
+    tenant_id="tenant_premium",
+    brand_id="brand_main"
+)
+
+# Add attachments
+broadcast.add_attachment("/path/to/newsletter.pdf", "Newsletter.pdf")
+broadcast.add_attachment("/path/to/banner.png", "Banner.png")
+
+# Send the broadcast
+response = supr_client.subscriber_lists.broadcast(broadcast)
+
+if response["success"]:
+    print("Broadcast sent successfully!")
+    print(f"Status: {response['status']}")
+else:
+    print(f"Broadcast failed: {response['message']}")
+```
+
+---
+
+## Broadcast Body Structure
+
+The broadcast body should contain the following fields:
+
+### Required Fields
+
+- `list_id` (str): The ID of the subscriber list to broadcast to
+- `template` (str): The notification template to use
+
+### Optional Fields
+
+- `notification_category` (str): Category of the notification (e.g., "transactional", "promotional")
+- `data` (dict): Dynamic data to populate the template
+- `channels` (list): Specific channels to use for the broadcast (e.g., ["email", "sms"])
+- `override` (dict): Channel-specific overrides
+- `delay` (str): Delay before sending (e.g., "15m", "1h")
+
+### Example Body
+
+```python
+body = {
+    "list_id": "premium_users",
+    "template": "product_update",
+    "notification_category": "promotional",
+    "data": {
+        "product_name": "Premium Plan",
+        "update_details": "New features available",
+        "release_date": "2024-03-15"
+    },
+    "channels": ["email", "sms"],
+    "delay": "30m"
+}
+```
+
+---
+
+## Size Limits
+
+The broadcast body has a maximum apparent size limit of **100 KB** (102,400 bytes). This includes:
+- The JSON body content
+- All attachments (base64 encoded)
+- All metadata fields
+
+If the body exceeds this limit, an `InputValueError` will be raised when calling `get_final_json()`.
+
+---
+
+## Best Practices
+
+1. **Use Idempotency Keys**: Always set an idempotency key to prevent duplicate broadcasts if the request is retried
+
+2. **Validate Before Sending**: Use `as_json()` to inspect the broadcast payload before sending
+
+3. **Handle Large Attachments**: Keep attachment sizes small or host large files externally and include links in the message data
+
+4. **Test with Small Lists**: Test broadcasts on a small subscriber list before sending to large audiences
+
+5. **Monitor Response**: Always check the response status and handle errors appropriately
+
+```python
+response = supr_client.subscriber_lists.broadcast(broadcast)
+
+if not response["success"]:
+    print(f"Error: {response['message']}")
+    print(f"Status code: {response['status_code']}")
+    # Handle error (log, retry, alert, etc.)
+```

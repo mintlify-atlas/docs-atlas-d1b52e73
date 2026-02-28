@@ -1,0 +1,445 @@
+---
+title: 'Bulk User Operations'
+description: 'Efficiently update multiple users in a single API call'
+---
+
+## Overview
+
+Bulk user operations allow you to update multiple users efficiently in a single API call. This is ideal for importing users, syncing data from your database, or performing large-scale updates.
+
+## Creating a Bulk Instance
+
+First, create a bulk users instance:
+
+```python
+from suprsend import Suprsend
+
+# Initialize SDK
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+# Create bulk users instance
+bulk_ins = supr_client.bulk_users.new_instance()
+```
+
+## Adding Users to Bulk Instance
+
+Create individual user instances and add them to the bulk instance:
+
+```python
+# Create first user
+u1 = supr_client.user.get_instance("user_1")
+u1.add_email("user1@example.com")
+u1.set("first_name", "John")
+u1.set("plan", "premium")
+
+# Create second user
+u2 = supr_client.user.get_instance("user_2")
+u2.add_email("user2@example.com")
+u2.set("first_name", "Jane")
+u2.set("plan", "free")
+
+# Add users to bulk instance (one by one)
+bulk_ins.append(u1)
+bulk_ins.append(u2)
+
+# OR add multiple users at once
+bulk_ins.append(u1, u2)
+```
+
+## Saving Bulk Changes
+
+Once all users are added, call `save()` to execute the bulk operation:
+
+```python
+# Execute bulk operation
+response = bulk_ins.save()
+print(response)
+```
+
+### Response Structure
+
+The bulk response includes details about success and failures:
+
+```python
+{
+    "status": "success",
+    "total": 100,
+    "success": 98,
+    "failure": 2,
+    "failed_records": [
+        {
+            "record": {"distinct_id": "user_123", ...},
+            "error": "Invalid email format",
+            "code": 400
+        }
+    ]
+}
+```
+
+## Complete Example
+
+Here's a complete example of bulk user operations:
+
+```python
+from suprsend import Suprsend
+
+# Initialize SDK
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+# Create bulk instance
+bulk_ins = supr_client.bulk_users.new_instance()
+
+# Prepare multiple users
+users_data = [
+    {
+        "distinct_id": "user_1",
+        "email": "user1@example.com",
+        "first_name": "John",
+        "plan": "premium"
+    },
+    {
+        "distinct_id": "user_2",
+        "email": "user2@example.com",
+        "first_name": "Jane",
+        "plan": "free"
+    },
+    {
+        "distinct_id": "user_3",
+        "email": "user3@example.com",
+        "first_name": "Bob",
+        "plan": "basic"
+    }
+]
+
+# Create user instances and add to bulk
+for user_data in users_data:
+    user = supr_client.user.get_instance(user_data["distinct_id"])
+    user.add_email(user_data["email"])
+    user.set("first_name", user_data["first_name"])
+    user.set("plan", user_data["plan"])
+    bulk_ins.append(user)
+
+# Execute bulk operation
+response = bulk_ins.save()
+
+if response.status == "success":
+    print(f"Successfully updated {response.success} users")
+    if response.failure > 0:
+        print(f"Failed to update {response.failure} users")
+        for failed in response.failed_records:
+            print(f"Failed: {failed['record']['distinct_id']} - {failed['error']}")
+else:
+    print("Bulk operation failed")
+```
+
+## Bulk Operations with Channels
+
+Add multiple communication channels for users in bulk:
+
+```python
+from suprsend import Suprsend
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+bulk_ins = supr_client.bulk_users.new_instance()
+
+# User 1 with email and SMS
+u1 = supr_client.user.get_instance("user_1")
+u1.add_email("user1@example.com")
+u1.add_sms("+1234567890")
+u1.add_androidpush("fcm_token_1")
+
+# User 2 with email and WhatsApp
+u2 = supr_client.user.get_instance("user_2")
+u2.add_email("user2@example.com")
+u2.add_whatsapp("+9876543210")
+u2.add_iospush("ios_token_2")
+
+# Add to bulk instance
+bulk_ins.append(u1, u2)
+
+# Save
+response = bulk_ins.save()
+print(response)
+```
+
+## Bulk Operations with Properties
+
+Update properties for multiple users:
+
+```python
+# Bulk update user properties
+bulk_ins = supr_client.bulk_users.new_instance()
+
+for i in range(1, 101):
+    user = supr_client.user.get_instance(f"user_{i}")
+    
+    # Set properties
+    user.set({
+        "account_status": "active",
+        "last_updated": "2024-01-15"
+    })
+    
+    # Increment login count
+    user.increment("total_logins", 1)
+    
+    # Set preferred language and timezone
+    user.set_preferred_language("en")
+    user.set_timezone("America/New_York")
+    
+    bulk_ins.append(user)
+
+# Execute bulk update
+response = bulk_ins.save()
+print(f"Updated {response.success} users")
+```
+
+## Importing Users from Database
+
+Example of importing users from a database:
+
+```python
+import psycopg2
+from suprsend import Suprsend
+
+# Initialize SDK
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+# Connect to database
+conn = psycopg2.connect("dbname=mydb user=postgres")
+cur = conn.cursor()
+
+# Fetch users from database
+cur.execute("SELECT id, email, phone, first_name, plan FROM users")
+db_users = cur.fetchall()
+
+# Create bulk instance
+bulk_ins = supr_client.bulk_users.new_instance()
+
+# Process each user
+for db_user in db_users:
+    user_id, email, phone, first_name, plan = db_user
+    
+    # Create user instance
+    user = supr_client.user.get_instance(str(user_id))
+    
+    # Add channels
+    if email:
+        user.add_email(email)
+    if phone:
+        user.add_sms(phone)
+    
+    # Set properties
+    user.set({
+        "first_name": first_name,
+        "plan": plan,
+        "synced_at": "2024-01-15T10:30:00Z"
+    })
+    
+    # Add to bulk
+    bulk_ins.append(user)
+
+# Execute bulk operation
+response = bulk_ins.save()
+
+print(f"Imported {response.success} users successfully")
+if response.failure > 0:
+    print(f"Failed to import {response.failure} users")
+
+# Close database connection
+cur.close()
+conn.close()
+```
+
+## Processing in Batches
+
+For very large datasets, process users in batches:
+
+```python
+from suprsend import Suprsend
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+# Simulate large user list
+all_users = []
+for i in range(1, 10001):  # 10,000 users
+    all_users.append({
+        "distinct_id": f"user_{i}",
+        "email": f"user{i}@example.com",
+        "name": f"User {i}"
+    })
+
+# Process in batches of 1000
+batch_size = 1000
+total_success = 0
+total_failure = 0
+
+for i in range(0, len(all_users), batch_size):
+    batch = all_users[i:i + batch_size]
+    
+    # Create bulk instance for this batch
+    bulk_ins = supr_client.bulk_users.new_instance()
+    
+    # Add users to bulk instance
+    for user_data in batch:
+        user = supr_client.user.get_instance(user_data["distinct_id"])
+        user.add_email(user_data["email"])
+        user.set("name", user_data["name"])
+        bulk_ins.append(user)
+    
+    # Execute bulk operation for this batch
+    response = bulk_ins.save()
+    total_success += response.success
+    total_failure += response.failure
+    
+    print(f"Processed batch {i // batch_size + 1}: "
+          f"{response.success} success, {response.failure} failures")
+
+print(f"\nTotal: {total_success} success, {total_failure} failures")
+```
+
+## Removing Channels in Bulk
+
+Remove channels for multiple users:
+
+```python
+from suprsend import Suprsend
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+bulk_ins = supr_client.bulk_users.new_instance()
+
+# List of users to update
+user_ids = ["user_1", "user_2", "user_3", "user_4", "user_5"]
+
+for user_id in user_ids:
+    user = supr_client.user.get_instance(user_id)
+    
+    # Remove old email
+    user.remove_email("old@example.com")
+    
+    # Add new email
+    user.add_email("new@example.com")
+    
+    # Unset SMS (delete all SMS numbers)
+    user.unset("$sms")
+    
+    bulk_ins.append(user)
+
+# Execute bulk operation
+response = bulk_ins.save()
+print(response)
+```
+
+## Handling Errors
+
+Properly handle errors in bulk operations:
+
+```python
+from suprsend import Suprsend
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+bulk_ins = supr_client.bulk_users.new_instance()
+
+# Add users (some might be invalid)
+for i in range(1, 101):
+    user = supr_client.user.get_instance(f"user_{i}")
+    user.add_email(f"user{i}@example.com")
+    bulk_ins.append(user)
+
+# Execute and handle response
+response = bulk_ins.save()
+
+if response.status == "success":
+    print(f"✓ Successfully processed {response.success} users")
+    
+    # Check for partial failures
+    if response.failure > 0:
+        print(f"\n⚠ {response.failure} users failed:")
+        for failed in response.failed_records:
+            distinct_id = failed['record'].get('distinct_id', 'unknown')
+            error = failed.get('error', 'Unknown error')
+            print(f"  - {distinct_id}: {error}")
+    else:
+        print("All users processed successfully!")
+else:
+    print(f"✗ Bulk operation failed: {response.status}")
+```
+
+## Performance Considerations
+
+<CardGroup cols={2}>
+  <Card title="No Limit on Records" icon="infinity">
+    There's no hard limit on the number of records you can add to a bulk instance.
+  </Card>
+  <Card title="Automatic Chunking" icon="boxes-stacked">
+    The SDK automatically splits large batches into optimal chunks for processing.
+  </Card>
+  <Card title="Chunk Size Calculation" icon="calculator">
+    Chunks are created based on record byte size and maximum allowed chunk size.
+  </Card>
+  <Card title="Sequential Processing" icon="list-ol">
+    Chunks are processed sequentially, and responses are merged automatically.
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Batch Large Imports" icon="layer-group">
+    Process very large datasets in batches (e.g., 1,000-5,000 users per batch).
+  </Card>
+  <Card title="Error Handling" icon="shield-check">
+    Always check the response for failed records and handle them appropriately.
+  </Card>
+  <Card title="Validate Data First" icon="check-double">
+    Validate user data before adding to bulk instance to minimize failures.
+  </Card>
+  <Card title="Monitor Progress" icon="chart-line">
+    Log progress when processing large batches to track completion.
+  </Card>
+</CardGroup>
+
+## Limitations
+
+- **Single Event Size**: Each user event must not exceed 100KB
+- **Chunk Size**: Each chunk is limited to a maximum apparent size
+- **Response Time**: Large bulk operations may take longer to complete
+
+## Response Attributes
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `status` | string | Overall status: "success" or "fail" |
+| `total` | int | Total number of user records processed |
+| `success` | int | Number of successfully processed users |
+| `failure` | int | Number of failed user records |
+| `failed_records` | list | Details of each failed record |
+
+### Failed Record Structure
+
+```python
+{
+    "record": {
+        "distinct_id": "user_123",
+        "$user_operations": [...]
+    },
+    "error": "Error message describing the failure",
+    "code": 400  # HTTP status code
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Managing Users" icon="user" href="/users/managing-users">
+    Learn the basics of user management
+  </Card>
+  <Card title="User Properties" icon="sliders" href="/users/user-properties">
+    Set language, timezone, and custom properties
+  </Card>
+  <Card title="Channel Management" icon="messages" href="/users/channel-management">
+    Add and manage communication channels
+  </Card>
+  <Card title="Workflows" icon="sitemap" href="/workflows/trigger-workflow">
+    Trigger workflows for your users
+  </Card>
+</CardGroup>

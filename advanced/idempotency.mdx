@@ -1,0 +1,287 @@
+---
+title: Idempotency
+description: Ensure reliable delivery with idempotency keys
+icon: shield
+---
+
+Idempotency keys help you safely retry operations without creating duplicate notifications or events. This is essential for building reliable notification systems.
+
+## What is idempotency?
+
+An idempotent operation can be performed multiple times with the same result. In SuprSend, idempotency keys ensure that if you send the same request twice, only one notification is delivered.
+
+## Why use idempotency keys?
+
+Idempotency keys are crucial for:
+
+- **Network failures**: Retry failed requests safely
+- **Timeout handling**: Resend requests that timed out
+- **Duplicate prevention**: Avoid sending duplicate notifications
+- **Webhook tracking**: Track notification lifecycle events
+
+## How it works
+
+When you include an idempotency key:
+
+1. SuprSend processes the request and stores the key
+2. If you send another request with the same key within 24 hours, SuprSend skips processing
+3. You receive a success response indicating the request was already processed
+
+<Note>
+Idempotency keys are valid for 24 hours after the initial request.
+</Note>
+
+## Using idempotency with workflows
+
+### Basic example
+
+```python
+from suprsend import WorkflowTriggerRequest
+
+wf = WorkflowTriggerRequest(
+    body={
+        "workflow": "order-confirmation",
+        "recipients": [{"distinct_id": "user123"}],
+        "data": {"order_id": "ORDER-789"}
+    },
+    idempotency_key="order-789-confirmation"
+)
+
+response = supr_client.workflows.trigger(wf)
+```
+
+### Idempotency key format
+
+Idempotency keys must:
+- Be strings
+- Have a maximum length of 64 characters
+- Be unique for each distinct operation
+
+<Tip>
+Use meaningful idempotency keys that relate to your business logic (e.g., `order-{order_id}-confirmation`).
+</Tip>
+
+## Using idempotency with events
+
+```python
+from suprsend import Event
+import uuid
+
+event = Event(
+    distinct_id="user123",
+    event_name="purchase_completed",
+    properties={
+        "order_id": "ORDER-789",
+        "amount": 99.99
+    },
+    idempotency_key=f"purchase-ORDER-789-{uuid.uuid4().hex[:8]}"
+)
+
+response = supr_client.track_event(event)
+```
+
+## Using idempotency with broadcasts
+
+```python
+from suprsend import SubscriberListBroadcast
+from datetime import datetime
+
+broadcast_body = {
+    "list_id": "premium-users",
+    "template": "feature-announcement",
+    "data": {"feature_name": "New Dashboard"}
+}
+
+# Use timestamp-based key for one-time broadcasts
+idempotency_key = f"broadcast-{datetime.now().strftime('%Y%m%d')}-feature-announcement"
+
+broadcast = SubscriberListBroadcast(
+    body=broadcast_body,
+    idempotency_key=idempotency_key
+)
+
+response = supr_client.subscriber_lists.broadcast(broadcast)
+```
+
+## Idempotency key strategies
+
+### Transaction-based keys
+
+Use transaction IDs for transactional notifications:
+
+```python
+order_id = "ORDER-12345"
+idempotency_key = f"order-confirmation-{order_id}"
+```
+
+### User-action keys
+
+Combine user ID and action for user-triggered events:
+
+```python
+user_id = "user123"
+action = "profile_updated"
+timestamp = "20240315120000"
+idempotency_key = f"{user_id}-{action}-{timestamp}"
+```
+
+### Time-based keys
+
+For periodic notifications:
+
+```python
+from datetime import datetime
+
+date_str = datetime.now().strftime("%Y%m%d")
+idempotency_key = f"daily-digest-{user_id}-{date_str}"
+```
+
+### UUID-based keys
+
+For unique one-time operations:
+
+```python
+import uuid
+
+idempotency_key = f"notification-{uuid.uuid4()}"
+```
+
+<Warning>
+UUID-based keys don't prevent duplicates on retry. Use them only when you're certain the operation won't be retried.
+</Warning>
+
+## Retry logic example
+
+Here's how to implement safe retry logic with idempotency:
+
+```python
+import time
+from suprsend import WorkflowTriggerRequest, SuprsendAPIException
+
+def send_notification_with_retry(order_id, user_id, max_retries=3):
+    idempotency_key = f"order-{order_id}-confirmation"
+    
+    wf = WorkflowTriggerRequest(
+        body={
+            "workflow": "order-confirmation",
+            "recipients": [{"distinct_id": user_id}],
+            "data": {"order_id": order_id}
+        },
+        idempotency_key=idempotency_key
+    )
+    
+    for attempt in range(max_retries):
+        try:
+            response = supr_client.workflows.trigger(wf)
+            if response["success"]:
+                print(f"Notification sent successfully (attempt {attempt + 1})")
+                return response
+        except SuprsendAPIException as e:
+            if attempt < max_retries - 1:
+                wait_time = 2 ** attempt  # Exponential backoff
+                print(f"Attempt {attempt + 1} failed, retrying in {wait_time}s...")
+                time.sleep(wait_time)
+            else:
+                print(f"All {max_retries} attempts failed")
+                raise
+    
+    return None
+
+# Usage
+response = send_notification_with_retry("ORDER-789", "user123")
+```
+
+## Tracking with webhooks
+
+You can use idempotency keys to correlate webhook events with your requests:
+
+```python
+# Send notification with idempotency key
+idempotency_key = f"order-{order_id}-confirmation"
+wf = WorkflowTriggerRequest(
+    body={...},
+    idempotency_key=idempotency_key
+)
+response = supr_client.workflows.trigger(wf)
+
+# In your webhook handler
+def handle_webhook(webhook_data):
+    received_key = webhook_data.get("idempotency_key")
+    # Match against your stored keys
+    if received_key == f"order-{order_id}-confirmation":
+        # Update order status, send confirmation email, etc.
+        update_order_status(order_id, "notification_delivered")
+```
+
+## Best practices
+
+<CardGroup cols={2}>
+  <Card title="Always use keys" icon="key">
+    Use idempotency keys for all production workflows and events
+  </Card>
+  <Card title="Meaningful keys" icon="tag">
+    Create keys that relate to your business logic for easier debugging
+  </Card>
+  <Card title="Consistent format" icon="equals">
+    Use a consistent naming pattern across your application
+  </Card>
+  <Card title="Key length" icon="ruler">
+    Keep keys under 64 characters
+  </Card>
+  <Card title="Unique per operation" icon="fingerprint">
+    Ensure keys are unique for distinct operations, but identical for retries
+  </Card>
+  <Card title="Document patterns" icon="book">
+    Document your idempotency key patterns for your team
+  </Card>
+</CardGroup>
+
+## Common pitfalls
+
+### Don't use random keys for retryable operations
+
+```python
+# ❌ Bad: Different key on each retry
+import uuid
+idempotency_key = str(uuid.uuid4())
+
+# ✅ Good: Same key for the same operation
+idempotency_key = f"order-{order_id}-confirmation"
+```
+
+### Don't reuse keys for different operations
+
+```python
+# ❌ Bad: Same key for different orders
+idempotency_key = f"order-confirmation-{user_id}"
+
+# ✅ Good: Include order ID for uniqueness
+idempotency_key = f"order-{order_id}-confirmation-{user_id}"
+```
+
+### Don't exceed 64 characters
+
+```python
+# ❌ Bad: Key too long
+idempotency_key = f"very-long-prefix-order-confirmation-{order_id}-{user_id}-{timestamp}"
+
+# ✅ Good: Concise but unique
+idempotency_key = f"order-{order_id}-conf"
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Error handling" icon="triangle-exclamation" href="/guides/error-handling">
+    Learn about error handling and retry strategies
+  </Card>
+  <Card title="Workflows" icon="diagram-project" href="/workflows/triggering-workflows">
+    Trigger workflows with idempotency
+  </Card>
+  <Card title="Events" icon="chart-line" href="/events/tracking-events">
+    Track events with idempotency
+  </Card>
+  <Card title="Best practices" icon="lightbulb" href="/guides/best-practices">
+    Review SDK best practices
+  </Card>
+</CardGroup>

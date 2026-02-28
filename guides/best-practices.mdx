@@ -1,0 +1,586 @@
+---
+title: Best Practices
+description: Best practices and recommendations for using the SuprSend Python SDK effectively
+---
+
+## Client Initialization
+
+### Reuse Client Instances
+
+Create a single client instance and reuse it throughout your application.
+
+```python
+from suprsend import Suprsend
+
+# Good: Create once, reuse everywhere
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+# Use the same instance for all operations
+response1 = supr_client.workflows.trigger(workflow1)
+response2 = supr_client.workflows.trigger(workflow2)
+```
+
+**Avoid:**
+```python
+# Bad: Creating new instances unnecessarily
+def send_notification(data):
+    client = Suprsend("workspace_key", "workspace_secret")  # Don't do this
+    return client.workflows.trigger(data)
+```
+
+### Store Credentials Securely
+
+Never hardcode credentials in your source code.
+
+```python
+import os
+from suprsend import Suprsend
+
+# Good: Use environment variables
+supr_client = Suprsend(
+    os.environ.get("SUPRSEND_WORKSPACE_KEY"),
+    os.environ.get("SUPRSEND_WORKSPACE_SECRET")
+)
+```
+
+**Alternative: Use a configuration file**
+```python
+import json
+from suprsend import Suprsend
+
+# Load from config file (not committed to version control)
+with open("config.json") as f:
+    config = json.load(f)
+
+supr_client = Suprsend(
+    config["workspace_key"],
+    config["workspace_secret"]
+)
+```
+
+## Error Handling
+
+### Always Catch Exceptions
+
+Wrap SDK calls in try-except blocks to handle errors gracefully.
+
+```python
+from suprsend import (
+    SuprsendAPIException,
+    SuprsendValidationError,
+    SuprsendError
+)
+
+try:
+    response = supr_client.workflows.trigger(workflow_body)
+except SuprsendValidationError as e:
+    # Handle validation errors
+    print(f"Validation error: {e.message}")
+    # Log and fix the data
+except SuprsendAPIException as e:
+    # Handle API errors
+    print(f"API error [{e.status_code}]: {e.message}")
+    # Implement retry logic if needed
+except SuprsendError as e:
+    # Handle other SuprSend errors
+    print(f"SuprSend error: {e.message}")
+except Exception as e:
+    # Catch-all for unexpected errors
+    print(f"Unexpected error: {e}")
+```
+
+### Implement Retry Logic
+
+Retry failed requests with exponential backoff for transient errors.
+
+```python
+import time
+from suprsend import SuprsendAPIException
+
+def trigger_with_retry(supr_client, workflow_body, max_retries=3):
+    """Trigger workflow with automatic retry on transient errors."""
+    
+    for attempt in range(max_retries):
+        try:
+            return supr_client.workflows.trigger(workflow_body)
+        except SuprsendAPIException as e:
+            # Retry on rate limits and server errors
+            if e.status_code in [429, 500, 502, 503, 504]:
+                if attempt < max_retries - 1:
+                    wait_time = (2 ** attempt) + (random.random() * 0.1)
+                    print(f"Retrying in {wait_time:.2f}s...")
+                    time.sleep(wait_time)
+                else:
+                    raise  # Max retries reached
+            else:
+                # Don't retry on client errors (4xx)
+                raise
+```
+
+## Bulk Operations
+
+### Use Bulk APIs for Multiple Operations
+
+When triggering multiple workflows or events, use bulk APIs for better performance.
+
+```python
+from suprsend import BulkWorkflowsFactory
+
+# Good: Use bulk API
+bulk_ins = BulkWorkflowsFactory()
+
+for user in users:
+    workflow = supr_client.workflows.trigger({
+        "name": "welcome_notification",
+        "users": [{"distinct_id": user["id"]}],
+        "data": {"name": user["name"]}
+    })
+    bulk_ins.append(workflow)
+
+response = bulk_ins.trigger()
+```
+
+**Avoid:**
+```python
+# Bad: Individual API calls in a loop
+for user in users:
+    response = supr_client.workflows.trigger({...})  # Inefficient
+```
+
+### Respect Bulk Limits
+
+Stay within bulk API limits and size constraints.
+
+```python
+from suprsend import BulkWorkflowsFactory
+
+MAX_BATCH_SIZE = 100  # API limit
+MAX_BATCH_SIZE_BYTES = 800 * 1024  # 800KB
+
+def trigger_bulk_workflows(supr_client, workflows):
+    """Process workflows in batches respecting limits."""
+    
+    for i in range(0, len(workflows), MAX_BATCH_SIZE):
+        batch = workflows[i:i + MAX_BATCH_SIZE]
+        bulk_ins = BulkWorkflowsFactory()
+        
+        for workflow_data in batch:
+            workflow = supr_client.workflows.trigger(workflow_data)
+            bulk_ins.append(workflow)
+        
+        try:
+            response = bulk_ins.trigger()
+            print(f"Batch {i//MAX_BATCH_SIZE + 1}: "
+                  f"{response.success_count} succeeded, "
+                  f"{response.failed_count} failed")
+        except Exception as e:
+            print(f"Batch failed: {e}")
+```
+
+### Handle Bulk Response Failures
+
+Check individual failures in bulk responses.
+
+```python
+response = bulk_ins.trigger()
+
+print(f"Success: {response.success_count}")
+print(f"Failed: {response.failed_count}")
+
+# Process failures
+if response.failed_count > 0:
+    for failure in response.failed:
+        print(f"Failed record: {failure}")
+        # Implement retry logic or logging
+```
+
+## Payload Management
+
+### Validate Data Before Sending
+
+Validate your data structure before making API calls.
+
+```python
+def validate_workflow_body(body):
+    """Validate workflow body structure."""
+    required_fields = ["name", "users", "data"]
+    
+    for field in required_fields:
+        if field not in body:
+            raise ValueError(f"Missing required field: {field}")
+    
+    if not isinstance(body["users"], list) or len(body["users"]) == 0:
+        raise ValueError("Users must be a non-empty list")
+    
+    for user in body["users"]:
+        if "distinct_id" not in user:
+            raise ValueError("Each user must have a distinct_id")
+    
+    return True
+
+# Usage
+try:
+    validate_workflow_body(workflow_body)
+    response = supr_client.workflows.trigger(workflow_body)
+except ValueError as e:
+    print(f"Validation failed: {e}")
+```
+
+### Monitor Payload Sizes
+
+Keep track of payload sizes to avoid hitting limits.
+
+```python
+import json
+
+def estimate_payload_size(data, num_attachments=0):
+    """Estimate apparent size of payload."""
+    base_size = len(json.dumps(data).encode('utf-8'))
+    runtime_overhead = 200
+    attachment_overhead = num_attachments * 2100
+    return base_size + runtime_overhead + attachment_overhead
+
+# Check before sending
+workflow_data = {...}
+size = estimate_payload_size(workflow_data)
+
+if size > 800 * 1024:  # 800KB limit
+    print(f"Warning: Payload too large ({size} bytes)")
+    # Split or reduce payload
+else:
+    response = supr_client.workflows.trigger(workflow_data)
+```
+
+### Minimize Payload Size
+
+Keep your payloads lean and efficient.
+
+```python
+# Good: Minimal, necessary data
+workflow_body = {
+    "name": "order_confirmation",
+    "users": [{"distinct_id": "user123"}],
+    "data": {
+        "order_id": "ORD-001",
+        "amount": 99.99,
+        "items_count": 3
+    }
+}
+
+# Avoid: Sending large, unnecessary data
+workflow_body = {
+    "name": "order_confirmation",
+    "users": [{"distinct_id": "user123"}],
+    "data": {
+        "order_id": "ORD-001",
+        "full_order_details": {...},  # Large nested object
+        "user_history": [...],  # Unnecessary data
+        "metadata": {...}  # Redundant information
+    }
+}
+```
+
+## User Management
+
+### Use Distinct IDs Consistently
+
+Always use the same identifier format for users.
+
+```python
+# Good: Consistent identifier format
+workflow_body = {
+    "name": "notification",
+    "users": [
+        {"distinct_id": "user_12345"},
+        {"distinct_id": "user_67890"}
+    ]
+}
+
+# Avoid: Mixing identifier formats
+workflow_body = {
+    "name": "notification",
+    "users": [
+        {"distinct_id": "12345"},  # Numeric string
+        {"distinct_id": "user_67890"},  # Prefixed string
+        {"distinct_id": 99999}  # Number (wrong type)
+    ]
+}
+```
+
+### Update User Properties Efficiently
+
+```python
+from suprsend import Subscriber
+
+# Get subscriber instance
+user = supr_client.user.get_instance("user123")
+
+# Batch multiple property updates
+user.append("tags", ["premium", "early_adopter"])
+user.set("plan", "enterprise")
+user.set("last_login", "2024-01-15T10:30:00Z")
+
+# Save once
+response = user.save()
+```
+
+## Attachments
+
+### Validate URLs Before Adding
+
+```python
+from urllib.parse import urlparse
+
+def is_valid_url(url):
+    """Validate attachment URL."""
+    try:
+        result = urlparse(url)
+        return all([result.scheme, result.netloc])
+    except:
+        return False
+
+# Usage
+attachment_url = "https://example.com/file.pdf"
+
+if is_valid_url(attachment_url):
+    workflow.add_attachment(attachment_url)
+else:
+    print(f"Invalid attachment URL: {attachment_url}")
+```
+
+### Limit Attachments in Bulk Operations
+
+Attachments add significant overhead (2100 bytes each).
+
+```python
+# Consider the size impact
+num_attachments = 5
+attachment_overhead = num_attachments * 2100  # 10,500 bytes
+
+# For bulk operations, consider:
+# 1. Limiting number of attachments per workflow
+# 2. Sending workflows with many attachments individually
+# 3. Using smaller batch sizes
+
+if num_attachments > 3:
+    # Send individually instead of bulk
+    response = supr_client.workflows.trigger(workflow_body)
+else:
+    # Can include in bulk
+    bulk_ins.append(workflow)
+```
+
+## Logging and Monitoring
+
+### Implement Comprehensive Logging
+
+```python
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+def send_notification(workflow_body):
+    try:
+        logger.info(f"Triggering workflow: {workflow_body['name']}")
+        response = supr_client.workflows.trigger(workflow_body)
+        logger.info(f"Workflow triggered successfully: {response}")
+        return response
+    except SuprsendAPIException as e:
+        logger.error(f"API error [{e.status_code}]: {e.message}")
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}", exc_info=True)
+        raise
+```
+
+### Track API Usage
+
+```python
+import time
+from collections import defaultdict
+
+class SuprsendMetrics:
+    def __init__(self):
+        self.call_count = defaultdict(int)
+        self.error_count = defaultdict(int)
+        self.total_time = defaultdict(float)
+    
+    def track_call(self, operation, duration, success=True):
+        self.call_count[operation] += 1
+        self.total_time[operation] += duration
+        if not success:
+            self.error_count[operation] += 1
+    
+    def get_stats(self):
+        return {
+            "calls": dict(self.call_count),
+            "errors": dict(self.error_count),
+            "avg_time": {
+                op: self.total_time[op] / self.call_count[op]
+                for op in self.call_count
+            }
+        }
+
+metrics = SuprsendMetrics()
+
+def trigger_with_metrics(workflow_body):
+    start_time = time.time()
+    try:
+        response = supr_client.workflows.trigger(workflow_body)
+        duration = time.time() - start_time
+        metrics.track_call("workflow_trigger", duration, success=True)
+        return response
+    except Exception as e:
+        duration = time.time() - start_time
+        metrics.track_call("workflow_trigger", duration, success=False)
+        raise
+```
+
+## Testing
+
+### Use Test Environment
+
+Use separate credentials for development and production.
+
+```python
+import os
+
+# Development
+if os.environ.get("ENV") == "development":
+    supr_client = Suprsend(
+        os.environ.get("SUPRSEND_DEV_KEY"),
+        os.environ.get("SUPRSEND_DEV_SECRET")
+    )
+# Production
+else:
+    supr_client = Suprsend(
+        os.environ.get("SUPRSEND_PROD_KEY"),
+        os.environ.get("SUPRSEND_PROD_SECRET")
+    )
+```
+
+### Mock SDK in Unit Tests
+
+```python
+from unittest.mock import Mock, patch
+import pytest
+
+def test_send_notification():
+    # Mock the SuprSend client
+    with patch('suprsend.Suprsend') as mock_suprsend:
+        mock_client = Mock()
+        mock_suprsend.return_value = mock_client
+        
+        # Mock the response
+        mock_client.workflows.trigger.return_value = {
+            "success": True,
+            "message": "Workflow triggered"
+        }
+        
+        # Test your function
+        result = send_notification({...})
+        
+        # Assertions
+        assert result["success"] is True
+        mock_client.workflows.trigger.assert_called_once()
+```
+
+## Performance Optimization
+
+### Use Async Operations for High Volume
+
+For high-volume operations, consider using async patterns.
+
+```python
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+
+def trigger_workflow(workflow_data):
+    try:
+        return supr_client.workflows.trigger(workflow_data)
+    except Exception as e:
+        return {"error": str(e)}
+
+async def trigger_workflows_async(workflows, max_workers=10):
+    """Trigger multiple workflows concurrently."""
+    loop = asyncio.get_event_loop()
+    
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [
+            loop.run_in_executor(executor, trigger_workflow, wf)
+            for wf in workflows
+        ]
+        results = await asyncio.gather(*futures)
+    
+    return results
+
+# Usage
+workflows = [...]  # Your workflow data
+results = asyncio.run(trigger_workflows_async(workflows))
+```
+
+### Cache Subscriber Instances
+
+```python
+from functools import lru_cache
+
+@lru_cache(maxsize=1000)
+def get_subscriber(user_id):
+    """Get subscriber with caching."""
+    return supr_client.user.get_instance(user_id)
+
+# Reuse cached instances
+user = get_subscriber("user123")
+user.set("property", "value")
+user.save()
+```
+
+## Security
+
+### Validate User Input
+
+Always validate and sanitize user input before using in workflows.
+
+```python
+import re
+
+def sanitize_distinct_id(user_input):
+    """Sanitize user ID input."""
+    # Remove potentially harmful characters
+    sanitized = re.sub(r'[^a-zA-Z0-9_-]', '', user_input)
+    
+    if len(sanitized) == 0 or len(sanitized) > 100:
+        raise ValueError("Invalid user ID")
+    
+    return sanitized
+
+# Usage
+user_input = request.form.get("user_id")
+try:
+    distinct_id = sanitize_distinct_id(user_input)
+    workflow = supr_client.workflows.trigger({
+        "name": "notification",
+        "users": [{"distinct_id": distinct_id}]
+    })
+except ValueError as e:
+    print(f"Invalid input: {e}")
+```
+
+### Don't Log Sensitive Data
+
+```python
+import logging
+
+logger = logging.getLogger(__name__)
+
+def send_notification(workflow_body):
+    # Good: Log non-sensitive information
+    logger.info(f"Triggering workflow: {workflow_body['name']}")
+    
+    # Bad: Don't log full payload which may contain PII
+    # logger.info(f"Full payload: {workflow_body}")  # Avoid this
+    
+    response = supr_client.workflows.trigger(workflow_body)
+    return response
+```

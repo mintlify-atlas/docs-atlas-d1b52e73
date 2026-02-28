@@ -1,0 +1,176 @@
+---
+title: Triggering Workflows
+description: Learn how to trigger workflows using the SuprSend Python SDK
+---
+
+## Overview
+
+Workflows in SuprSend allow you to send notifications through multiple channels based on pre-configured templates. You can trigger workflows using the `WorkflowTriggerRequest` class.
+
+## Basic Usage
+
+To trigger a workflow, create a `WorkflowTriggerRequest` instance with a workflow body and call the `trigger()` method:
+
+```python
+from suprsend import Suprsend, WorkflowTriggerRequest
+
+# Initialize SDK
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+# Create workflow request
+wf = WorkflowTriggerRequest(
+    body={
+        "workflow": "purchase-made",
+        "recipients": [
+            {
+                "distinct_id": "0f988f74-6982-41c5-8752-facb6911fb08",
+                "$email": ["user@example.com"],
+                "$androidpush": [
+                    {
+                        "token": "__android_push_token__",
+                        "provider": "fcm",
+                        "device_id": ""
+                    }
+                ]
+            }
+        ],
+        "data": {
+            "first_name": "User",
+            "spend_amount": "$10"
+        }
+    }
+)
+
+# Trigger workflow
+response = supr_client.workflows.trigger(wf)
+print(response)
+```
+
+## WorkflowTriggerRequest Parameters
+
+The `WorkflowTriggerRequest` class accepts the following parameters:
+
+<ParamField path="body" type="dict" required>
+  The workflow request body containing workflow name, recipients, and data
+</ParamField>
+
+<ParamField path="idempotency_key" type="str">
+  A unique key to prevent duplicate requests. Maximum length: 64 characters. Requests with the same idempotency key are skipped for 24 hours after the first request is processed.
+</ParamField>
+
+<ParamField path="tenant_id" type="str">
+  The tenant ID on behalf of which the workflow should run
+</ParamField>
+
+<ParamField path="cancellation_key" type="str">
+  A key that can be used to cancel the workflow execution
+</ParamField>
+
+## Using Idempotency Key
+
+Idempotency keys help avoid duplicate workflow triggers and enable tracking of webhooks:
+
+```python
+from suprsend import WorkflowTriggerRequest
+
+workflow_body = {
+    "workflow": "order-confirmation",
+    "recipients": [{"distinct_id": "user_123"}],
+    "data": {"order_id": "ORD-456"}
+}
+
+wf = WorkflowTriggerRequest(
+    body=workflow_body,
+    idempotency_key="order_confirmation_ORD-456"
+)
+
+response = supr_client.workflows.trigger(wf)
+```
+
+## Using Tenant ID
+
+You can trigger workflows on behalf of a specific tenant:
+
+```python
+wf = WorkflowTriggerRequest(
+    body=workflow_body,
+    idempotency_key="__uniq_request_id__",
+    tenant_id="default"
+)
+
+response = supr_client.workflows.trigger(wf)
+```
+
+## Response Format
+
+When you trigger a workflow, you receive an immediate response indicating acceptance status:
+
+### Success Response
+
+```python
+{
+    "success": True,
+    "status": "success",
+    "status_code": 202,
+    "message": "Message received"
+}
+```
+
+### Error Response
+
+```python
+{
+    "success": False,
+    "status": "fail",
+    "status_code": 400,  # or 500
+    "message": "error message"
+}
+```
+
+<Note>
+The response indicates whether the request was accepted. The actual workflow processing happens asynchronously.
+</Note>
+
+## Simplified Workflow Triggering
+
+If you've set channel details in the user profile, you only need to provide the `distinct_id`:
+
+```python
+from suprsend import WorkflowTriggerRequest
+
+request_body = {
+    "workflow": "purchase-made",
+    "recipients": [
+        {
+            "distinct_id": "0f988f74-6982-41c5-8752-facb6911fb08"
+        }
+    ],
+    "data": {
+        "first_name": "User",
+        "spend_amount": "$10"
+    }
+}
+
+wf = WorkflowTriggerRequest(body=request_body)
+response = supr_client.workflows.trigger(wf)
+```
+
+## Limitations
+
+<Warning>
+A single workflow body size must not exceed 800KB (800 * 1024 bytes). If the size exceeds this limit, the SDK raises a `ValueError`.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Workflow Data" icon="database" href="/workflows/workflow-data">
+    Learn how to pass data and configure recipients
+  </Card>
+  <Card title="Attachments" icon="paperclip" href="/workflows/attachments">
+    Add file attachments to your workflows
+  </Card>
+  <Card title="Bulk Workflows" icon="layer-group" href="/workflows/bulk-workflows">
+    Trigger multiple workflows in a single request
+  </Card>
+</CardGroup>

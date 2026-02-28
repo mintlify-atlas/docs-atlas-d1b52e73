@@ -1,0 +1,346 @@
+---
+title: "Suprsend"
+description: "Main client class for interacting with the SuprSend API"
+---
+
+## Suprsend
+
+The `Suprsend` class is the main client for the SuprSend Python SDK. It provides access to all SuprSend features including workflows, events, user management, and more.
+
+## Initialization
+
+```python
+from suprsend import Suprsend
+
+# Basic initialization
+supr_client = Suprsend("__workspace_key__", "__workspace_secret__")
+
+# With debug mode enabled
+supr_client = Suprsend("__workspace_key__", "__workspace_secret__", debug=True)
+
+# With custom base URL
+supr_client = Suprsend(
+    "__workspace_key__", 
+    "__workspace_secret__", 
+    base_url="https://example.com/",
+    debug=False
+)
+```
+
+### Parameters
+
+<ParamField path="workspace_key" type="string" required>
+  Your SuprSend workspace key. This identifies your workspace and is required for authentication.
+</ParamField>
+
+<ParamField path="workspace_secret" type="string" required>
+  Your SuprSend workspace secret. This is used to sign API requests and must be kept secure.
+</ParamField>
+
+<ParamField path="base_url" type="string" default="https://hub.suprsend.com/">
+  The base URL for the SuprSend API. Defaults to `https://hub.suprsend.com/`. Custom URLs are automatically formatted to end with a trailing slash.
+</ParamField>
+
+<ParamField path="debug" type="boolean" default={false}>
+  Enable debug mode for detailed HTTP request logging. When enabled, sets logging level to DEBUG for HTTP requests.
+</ParamField>
+
+## Properties
+
+### Core Properties
+
+<ParamField path="workspace_key" type="string">
+  The workspace key used for authentication.
+</ParamField>
+
+<ParamField path="workspace_secret" type="string">
+  The workspace secret used for signing requests.
+</ParamField>
+
+<ParamField path="base_url" type="string">
+  The base URL for API requests.
+</ParamField>
+
+<ParamField path="sdk_version" type="string">
+  The version of the SDK being used.
+</ParamField>
+
+<ParamField path="user_agent" type="string">
+  The user agent string sent with API requests. Format: `suprsend/{sdk_version};python/{python_version}`
+</ParamField>
+
+### API Modules
+
+<ParamField path="workflows" type="WorkflowsApi">
+  Access to workflow-related API methods. Use this for triggering workflows and managing workflow configurations.
+</ParamField>
+
+<ParamField path="tenants" type="TenantsApi">
+  Access to tenant management API methods.
+</ParamField>
+
+<ParamField path="brands" type="BrandsApi">
+  Access to brand management API methods.
+</ParamField>
+
+<ParamField path="objects" type="ObjectsApi">
+  Access to objects API methods.
+</ParamField>
+
+<ParamField path="users" type="UsersApi">
+  Access to user management API methods.
+</ParamField>
+
+<ParamField path="subscriber_lists" type="SubscriberListsApi">
+  Access to subscriber list management API methods.
+</ParamField>
+
+### Factory Properties
+
+<ParamField path="user" type="SubscriberFactory">
+  Factory for creating and managing individual user/subscriber instances.
+</ParamField>
+
+<ParamField path="bulk_workflows" type="BulkWorkflowsFactory">
+  Factory for bulk workflow operations. Use this to trigger multiple workflows efficiently in a single API call.
+</ParamField>
+
+<ParamField path="bulk_events" type="BulkEventsFactory">
+  Factory for bulk event tracking operations. Use this to track multiple events efficiently in a single API call.
+</ParamField>
+
+<ParamField path="bulk_users" type="BulkSubscribersFactory">
+  Factory for bulk user/subscriber operations. Use this to manage multiple users efficiently in a single API call.
+</ParamField>
+
+## Methods
+
+### trigger_workflow()
+
+Triggers a workflow to send notifications to users.
+
+```python
+from suprsend import Workflow
+
+# Create workflow instance
+workflow = Workflow(body_dict)
+
+# Trigger the workflow
+response = supr_client.trigger_workflow(workflow)
+```
+
+**Parameters**
+
+<ParamField path="data" type="Workflow | dict" required>
+  The workflow data to trigger. Can be a `Workflow` instance or a dictionary containing workflow configuration.
+</ParamField>
+
+**Returns**
+
+<ResponseField name="success" type="boolean">
+  Indicates whether the workflow was triggered successfully.
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Status of the request. Values: `"success"` or `"fail"`.
+</ResponseField>
+
+<ResponseField name="status_code" type="integer">
+  HTTP status code of the response (e.g., 202, 401, 500).
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Response message or error details.
+</ResponseField>
+
+**Exceptions**
+- `SuprsendValidationError` - If the workflow data is invalid
+
+---
+
+### track_event()
+
+Tracks a custom event for analytics and workflow triggers.
+
+```python
+from suprsend import Event
+
+# Create event instance
+event = Event(
+    distinct_id="user_123",
+    event_name="purchase_completed",
+    properties={"amount": 99.99, "currency": "USD"}
+)
+
+# Track the event
+response = supr_client.track_event(event)
+```
+
+**Parameters**
+
+<ParamField path="event" type="Event" required>
+  An instance of `suprsend.Event` containing the event details to track.
+</ParamField>
+
+**Returns**
+
+<ResponseField name="success" type="boolean">
+  Indicates whether the event was tracked successfully.
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Status of the request. Values: `"success"` or `"fail"`.
+</ResponseField>
+
+<ResponseField name="status_code" type="integer">
+  HTTP status code of the response.
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Response message containing the message ID or error details.
+</ResponseField>
+
+**Exceptions**
+- `SuprsendValidationError` - If the event data is invalid
+- `InputValueError` - If the argument is not an instance of `suprsend.Event`
+- `ValueError` - For other validation errors
+
+---
+
+### track() (Deprecated)
+
+<Warning>
+This method is deprecated. Use `track_event(Event)` instead.
+</Warning>
+
+Tracks a custom event using individual parameters.
+
+```python
+response = supr_client.track(
+    distinct_id="user_123",
+    event_name="purchase_completed",
+    properties={"amount": 99.99},
+    idempotency_key="unique_key",
+    tenant_id="tenant_123"
+)
+```
+
+**Parameters**
+
+<ParamField path="distinct_id" type="string" required>
+  Unique identifier for the user performing the event.
+</ParamField>
+
+<ParamField path="event_name" type="string" required>
+  Name of the event to track.
+</ParamField>
+
+<ParamField path="properties" type="dict">
+  Additional properties associated with the event.
+</ParamField>
+
+<ParamField path="idempotency_key" type="string">
+  Unique key to ensure event is processed only once.
+</ParamField>
+
+<ParamField path="tenant_id" type="string">
+  Tenant identifier for multi-tenant applications.
+</ParamField>
+
+<ParamField path="brand_id" type="string">
+  Brand identifier (deprecated, use tenant_id instead).
+</ParamField>
+
+---
+
+### add_attachment() (Deprecated)
+
+<Warning>
+This method is deprecated. Use `WorkflowTriggerRequest.add_attachment()` instead.
+</Warning>
+
+Adds an attachment to a workflow body.
+
+```python
+body = {"data": {}}
+body = supr_client.add_attachment(
+    body=body,
+    file_path="/path/to/file.pdf",
+    file_name="document.pdf",
+    ignore_if_error=False
+)
+```
+
+**Parameters**
+
+<ParamField path="body" type="dict" required>
+  The workflow body dictionary to add the attachment to.
+</ParamField>
+
+<ParamField path="file_path" type="string" required>
+  Path to the file to attach.
+</ParamField>
+
+<ParamField path="file_name" type="string">
+  Optional custom name for the file.
+</ParamField>
+
+<ParamField path="ignore_if_error" type="boolean" default={false}>
+  If true, silently ignore errors when reading the file.
+</ParamField>
+
+**Returns**
+
+<ResponseField name="body" type="dict">
+  The modified body dictionary with the attachment added to `data.$attachments`.
+</ResponseField>
+
+**Exceptions**
+- `InputValueError` - If body is not a dictionary
+
+## Error Handling
+
+The Suprsend client raises the following exceptions:
+
+- **`SuprsendConfigError`** - Raised during initialization if required configuration is missing
+  - Missing `workspace_key`
+  - Missing `workspace_secret`
+  - Missing `base_url`
+
+- **`SuprsendValidationError`** - Raised when request data fails validation
+  
+- **`InputValueError`** - Raised when input parameters are invalid
+
+## Example Usage
+
+```python
+from suprsend import Suprsend, Workflow, Event
+
+# Initialize client
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+# Trigger a workflow
+workflow_body = {
+    "workflow": "welcome-email",
+    "recipients": [{"distinct_id": "user@example.com"}],
+    "data": {"name": "John Doe"}
+}
+response = supr_client.trigger_workflow(workflow_body)
+
+# Track an event
+event = Event(
+    distinct_id="user@example.com",
+    event_name="page_viewed",
+    properties={"page": "/dashboard"}
+)
+response = supr_client.track_event(event)
+
+# Access API modules
+tenants = supr_client.tenants.list()
+brands = supr_client.brands.list()
+
+# Use bulk operations
+bulk_wf = supr_client.bulk_workflows.new_instance()
+# ... add workflows to bulk instance
+bulk_wf.trigger()
+```

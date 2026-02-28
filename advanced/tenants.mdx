@@ -1,0 +1,164 @@
+---
+title: Multi-tenancy with tenants
+description: Manage multiple tenants within your SuprSend workspace
+icon: users
+---
+
+The SuprSend Python SDK supports multi-tenancy, allowing you to manage multiple tenants within your workspace. Each tenant can have its own configuration, templates, and notification settings.
+
+## Overview
+
+Tenants in SuprSend allow you to:
+
+- Segment users by organization, account, or customer
+- Use different notification templates per tenant
+- Track notifications and events at the tenant level
+- Manage tenant-specific configurations
+
+## TenantsApi class
+
+Access tenant operations through the `supr_client.tenants` property:
+
+```python
+from suprsend import Suprsend
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+tenants_api = supr_client.tenants
+```
+
+## List tenants
+
+Retrieve all tenants with pagination:
+
+```python
+# Get first 20 tenants
+response = supr_client.tenants.list()
+
+# Get tenants with custom pagination
+response = supr_client.tenants.list(limit=50, offset=0)
+```
+
+**Parameters:**
+- `limit` (int, optional): Number of tenants to return (1-1000, default: 20)
+- `offset` (int, optional): Number of tenants to skip (default: 0)
+
+## Get tenant details
+
+Retrieve information about a specific tenant:
+
+```python
+tenant_id = "org-123"
+response = supr_client.tenants.get(tenant_id)
+```
+
+**Parameters:**
+- `tenant_id` (str, required): Unique identifier for the tenant
+
+## Create or update tenant
+
+Create a new tenant or update an existing one:
+
+```python
+tenant_id = "org-123"
+tenant_payload = {
+    "name": "Acme Corporation",
+    "config": {
+        "timezone": "America/New_York",
+        "language": "en"
+    }
+}
+
+response = supr_client.tenants.upsert(tenant_id, tenant_payload)
+```
+
+**Parameters:**
+- `tenant_id` (str, required): Unique identifier for the tenant
+- `tenant_payload` (dict, required): Tenant configuration data
+
+## Delete tenant
+
+Remove a tenant from your workspace:
+
+```python
+tenant_id = "org-123"
+response = supr_client.tenants.delete(tenant_id)
+
+# Response
+# {"success": True, "status_code": 200}
+```
+
+**Parameters:**
+- `tenant_id` (str, required): Unique identifier for the tenant to delete
+
+## Using tenants with workflows
+
+Specify a tenant when triggering workflows:
+
+```python
+from suprsend import WorkflowTriggerRequest
+
+wf = WorkflowTriggerRequest(
+    body={"workflow": "welcome", "recipients": [{"distinct_id": "user123"}]},
+    tenant_id="org-123"
+)
+
+response = supr_client.workflows.trigger(wf)
+```
+
+## Using tenants with events
+
+Track events associated with a tenant:
+
+```python
+from suprsend import Event
+
+event = Event(
+    distinct_id="user123",
+    event_name="purchase_completed",
+    properties={"amount": 99.99},
+    tenant_id="org-123"
+)
+
+response = supr_client.track_event(event)
+```
+
+## Error handling
+
+```python
+from suprsend import SuprsendAPIException, SuprsendValidationError
+
+try:
+    response = supr_client.tenants.get("invalid-id")
+except SuprsendValidationError as e:
+    print(f"Validation error: {e}")
+except SuprsendAPIException as e:
+    print(f"API error: {e}")
+```
+
+## Best practices
+
+<CardGroup cols={2}>
+  <Card title="Tenant naming" icon="tag">
+    Use consistent, meaningful tenant IDs (e.g., organization slugs or UUIDs)
+  </Card>
+  <Card title="Configuration" icon="gear">
+    Store tenant-specific settings in the tenant payload for easy management
+  </Card>
+  <Card title="Isolation" icon="shield">
+    Always include tenant_id when triggering workflows or tracking events for proper data isolation
+  </Card>
+  <Card title="Cleanup" icon="trash">
+    Delete tenants that are no longer active to keep your workspace organized
+  </Card>
+</CardGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Brands" icon="palette" href="/advanced/brands">
+    Learn about brand management for white-labeling
+  </Card>
+  <Card title="TenantsApi reference" icon="code" href="/api-reference/tenants">
+    View complete API reference
+  </Card>
+</CardGroup>

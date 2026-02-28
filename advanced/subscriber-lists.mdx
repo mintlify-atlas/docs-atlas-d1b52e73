@@ -1,0 +1,247 @@
+---
+title: Subscriber lists
+description: Manage and broadcast to groups of users
+icon: list
+---
+
+Subscriber lists allow you to organize users into groups and send targeted broadcasts to entire lists efficiently.
+
+## Overview
+
+Subscriber lists enable you to:
+
+- Group users by segments (e.g., premium users, beta testers)
+- Send one-time broadcasts to entire lists
+- Manage list membership dynamically
+- Use version-based syncing for large lists
+
+## SubscriberListsApi class
+
+Access subscriber list operations through the `supr_client.subscriber_lists` property:
+
+```python
+from suprsend import Suprsend
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+lists_api = supr_client.subscriber_lists
+```
+
+## Create a list
+
+Create a new subscriber list:
+
+```python
+payload = {
+    "list_id": "premium-users",
+    "list_name": "Premium Subscribers",
+    "list_description": "Users with premium subscription"
+}
+
+response = supr_client.subscriber_lists.create(payload)
+```
+
+## List all subscriber lists
+
+Retrieve all subscriber lists with pagination:
+
+```python
+# Get first 20 lists
+response = supr_client.subscriber_lists.get_all()
+
+# Get lists with custom pagination
+response = supr_client.subscriber_lists.get_all(limit=50, offset=0)
+```
+
+## Get list details
+
+Retrieve information about a specific list:
+
+```python
+list_id = "premium-users"
+response = supr_client.subscriber_lists.get(list_id)
+```
+
+## Add subscribers to a list
+
+Add users to a subscriber list:
+
+```python
+list_id = "premium-users"
+distinct_ids = ["user123", "user456", "user789"]
+
+response = supr_client.subscriber_lists.add(list_id, distinct_ids)
+```
+
+## Remove subscribers from a list
+
+Remove users from a subscriber list:
+
+```python
+list_id = "premium-users"
+distinct_ids = ["user123"]
+
+response = supr_client.subscriber_lists.remove(list_id, distinct_ids)
+```
+
+## Delete a list
+
+Delete an entire subscriber list:
+
+```python
+list_id = "premium-users"
+response = supr_client.subscriber_lists.delete(list_id)
+```
+
+## Broadcasting to a list
+
+Send a one-time notification to all users in a list:
+
+```python
+from suprsend import SubscriberListBroadcast
+
+broadcast_body = {
+    "list_id": "premium-users",
+    "template": "new-feature-announcement",
+    "notification_category": "transactional",
+    "data": {
+        "feature_name": "Advanced Analytics",
+        "launch_date": "2024-03-15"
+    }
+}
+
+broadcast = SubscriberListBroadcast(
+    body=broadcast_body,
+    idempotency_key="broadcast-20240315-001"
+)
+
+response = supr_client.subscriber_lists.broadcast(broadcast)
+```
+
+<Note>
+Broadcasts are one-time notifications sent to all list members. Use workflows for recurring or triggered notifications.
+</Note>
+
+## Version-based sync
+
+For large lists, use version-based syncing to efficiently update membership:
+
+### Start a new sync
+
+```python
+list_id = "premium-users"
+response = supr_client.subscriber_lists.start_sync(list_id)
+version_id = response["version_id"]
+```
+
+### Add users to version
+
+```python
+distinct_ids = ["user001", "user002", "user003"]
+response = supr_client.subscriber_lists.add_to_version(
+    list_id,
+    version_id,
+    distinct_ids
+)
+```
+
+### Remove users from version
+
+```python
+distinct_ids = ["user999"]
+response = supr_client.subscriber_lists.remove_from_version(
+    list_id,
+    version_id,
+    distinct_ids
+)
+```
+
+### Finish sync
+
+```python
+response = supr_client.subscriber_lists.finish_sync(list_id, version_id)
+```
+
+### Get version details
+
+```python
+response = supr_client.subscriber_lists.get_version(list_id, version_id)
+```
+
+### Delete version
+
+```python
+response = supr_client.subscriber_lists.delete_version(list_id, version_id)
+```
+
+## Complete sync workflow example
+
+```python
+# Step 1: Start sync
+list_id = "premium-users"
+response = supr_client.subscriber_lists.start_sync(list_id)
+version_id = response["version_id"]
+
+try:
+    # Step 2: Fetch current premium users from your database
+    current_premium_users = fetch_premium_users_from_db()
+    
+    # Step 3: Add them to the version
+    batch_size = 1000
+    for i in range(0, len(current_premium_users), batch_size):
+        batch = current_premium_users[i:i + batch_size]
+        supr_client.subscriber_lists.add_to_version(
+            list_id,
+            version_id,
+            batch
+        )
+    
+    # Step 4: Finish sync (this activates the version)
+    supr_client.subscriber_lists.finish_sync(list_id, version_id)
+    print("Sync completed successfully")
+    
+except Exception as e:
+    # Step 5: Clean up on error
+    supr_client.subscriber_lists.delete_version(list_id, version_id)
+    print(f"Sync failed: {e}")
+```
+
+## Best practices
+
+<CardGroup cols={2}>
+  <Card title="List hygiene" icon="broom">
+    Regularly update lists to remove inactive users
+  </Card>
+  <Card title="Batch operations" icon="layer-group">
+    Use batch operations for adding/removing multiple users
+  </Card>
+  <Card title="Version sync" icon="code-branch">
+    Use version-based sync for large lists (>10,000 users)
+  </Card>
+  <Card title="Idempotency" icon="shield">
+    Always use idempotency keys for broadcasts to prevent duplicates
+  </Card>
+</CardGroup>
+
+## Error handling
+
+```python
+from suprsend import SuprsendAPIException, SuprsendValidationError
+
+try:
+    response = supr_client.subscriber_lists.add("list-id", ["user123"])
+except SuprsendValidationError as e:
+    print(f"Validation error: {e}")
+except SuprsendAPIException as e:
+    print(f"API error: {e.status_code} - {e.message}")
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="SubscriberListsApi" icon="code" href="/api-reference/subscriber-lists">
+    View complete API reference
+  </Card>
+  <Card title="SubscriberListBroadcast" icon="code" href="/api-reference/subscriber-list-broadcast">
+    Learn about broadcast class
+  </Card>
+</CardGroup>

@@ -1,0 +1,125 @@
+---
+title: "BrandsApi"
+description: "Manage brands in your SuprSend workspace"
+---
+
+The `BrandsApi` class provides methods to manage brands for multi-tenant applications. Access it via `supr_client.brands`.
+
+## Methods
+
+### list
+
+Retrieve a list of all brands in your workspace.
+
+```python
+supr_client.brands.list(limit=20, offset=0)
+```
+
+**Parameters**
+
+<ParamField path="limit" type="int" default="20">
+  Number of brands to retrieve. Must be between 1 and 1000.
+</ParamField>
+
+<ParamField path="offset" type="int" default="0">
+  Number of brands to skip. Must be greater than or equal to 0.
+</ParamField>
+
+**Returns**
+
+A JSON object containing the list of brands.
+
+**Example**
+
+```python
+from suprsend import Suprsend
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+# Get first 20 brands
+response = supr_client.brands.list()
+
+# Get next 20 brands
+response = supr_client.brands.list(limit=20, offset=20)
+```
+
+---
+
+### get
+
+Retrieve details of a specific brand by ID.
+
+```python
+supr_client.brands.get(brand_id)
+```
+
+**Parameters**
+
+<ParamField path="brand_id" type="str" required>
+  The unique identifier of the brand.
+</ParamField>
+
+**Returns**
+
+A JSON object containing the brand details.
+
+**Example**
+
+```python
+from suprsend import Suprsend
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+response = supr_client.brands.get("brand_123")
+```
+
+**Raises**
+
+- `SuprsendAPIException`: If the API request fails.
+
+---
+
+### upsert
+
+Create a new brand or update an existing one.
+
+```python
+supr_client.brands.upsert(brand_id, brand_payload)
+```
+
+**Parameters**
+
+<ParamField path="brand_id" type="str" required>
+  The unique identifier of the brand.
+</ParamField>
+
+<ParamField path="brand_payload" type="Dict" required>
+  A dictionary containing brand properties to create or update.
+</ParamField>
+
+**Returns**
+
+A JSON object containing the upserted brand details.
+
+**Example**
+
+```python
+from suprsend import Suprsend
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+brand_data = {
+    "brand_name": "Acme Brand",
+    "logo": "https://example.com/logo.png",
+    "primary_color": "#FF5733",
+    "properties": {
+        "website": "https://acme.com"
+    }
+}
+
+response = supr_client.brands.upsert("brand_123", brand_data)
+```
+
+**Raises**
+
+- `SuprsendAPIException`: If the API request fails.

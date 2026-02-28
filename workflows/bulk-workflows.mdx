@@ -1,0 +1,333 @@
+---
+title: Bulk Workflow Operations
+description: Efficiently trigger multiple workflows in a single API call
+---
+
+## Overview
+
+The Bulk Workflow API allows you to trigger multiple workflows in a single request, making it ideal for batch processing scenarios like sending notifications to multiple users or triggering various workflows at scale.
+
+## Basic Usage
+
+Create a bulk instance, append workflow requests, and trigger them all at once:
+
+```python
+from suprsend import Suprsend, WorkflowTriggerRequest
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+# Create bulk instance
+bulk_ins = supr_client.workflows.bulk_trigger_instance()
+
+# Create workflow instances
+workflow1 = WorkflowTriggerRequest(body={
+    "workflow": "welcome-email",
+    "recipients": [{"distinct_id": "user_1"}],
+    "data": {"name": "John"}
+})
+
+workflow2 = WorkflowTriggerRequest(body={
+    "workflow": "welcome-email",
+    "recipients": [{"distinct_id": "user_2"}],
+    "data": {"name": "Jane"}
+})
+
+# Append workflows to bulk instance
+bulk_ins.append(workflow1)
+bulk_ins.append(workflow2)
+
+# Trigger all workflows
+response = bulk_ins.trigger()
+print(response)
+```
+
+## Appending Workflows
+
+You can append workflows individually or multiple at once:
+
+### Individual Append
+
+```python
+bulk_ins = supr_client.workflows.bulk_trigger_instance()
+
+bulk_ins.append(workflow1)
+bulk_ins.append(workflow2)
+bulk_ins.append(workflow3)
+```
+
+### Multiple Append
+
+```python
+bulk_ins = supr_client.workflows.bulk_trigger_instance()
+
+# Append multiple workflows in one call
+bulk_ins.append(workflow1, workflow2, workflow3)
+```
+
+### Mixed Approach
+
+```python
+bulk_ins = supr_client.workflows.bulk_trigger_instance()
+
+bulk_ins.append(workflow1, workflow2)
+bulk_ins.append(workflow3)
+bulk_ins.append(workflow4, workflow5, workflow6)
+```
+
+## Bulk Processing
+
+The SDK intelligently handles bulk requests:
+
+<Steps>
+  <Step title="Validation">
+    Each workflow is validated and its body size is calculated
+  </Step>
+  
+  <Step title="Chunking">
+    Workflows are automatically divided into chunks based on:
+    - Maximum chunk size (800KB)
+    - Maximum records per chunk
+    - Individual workflow sizes
+  </Step>
+  
+  <Step title="API Calls">
+    The SDK makes separate HTTP calls for each chunk
+  </Step>
+  
+  <Step title="Response Aggregation">
+    Responses from all chunks are merged into a single result
+  </Step>
+</Steps>
+
+<Note>
+There is no limit on the number of workflows you can add to a bulk instance. The SDK automatically creates optimal chunks.
+</Note>
+
+## Response Structure
+
+The bulk API returns a detailed response with statistics and error information:
+
+```python
+{
+    "status": "success",  # or "fail"
+    "status_code": 200,
+    "total": 100,         # Total workflows submitted
+    "success": 98,        # Successfully processed
+    "failure": 2,         # Failed workflows
+    "failed_records": [
+        {
+            "record": {...},          # The workflow body that failed
+            "error": "error message", # Error description
+            "code": 400               # HTTP status code
+        }
+    ],
+    "raw_response": {...}  # Raw API response
+}
+```
+
+### Response Fields
+
+<ResponseField name="status" type="string">
+  Overall status: `"success"` or `"fail"`
+</ResponseField>
+
+<ResponseField name="status_code" type="integer">
+  HTTP status code of the response
+</ResponseField>
+
+<ResponseField name="total" type="integer">
+  Total number of workflow requests submitted
+</ResponseField>
+
+<ResponseField name="success" type="integer">
+  Number of workflows successfully processed
+</ResponseField>
+
+<ResponseField name="failure" type="integer">
+  Number of workflows that failed
+</ResponseField>
+
+<ResponseField name="failed_records" type="array">
+  List of failed workflow records with error details
+</ResponseField>
+
+<ResponseField name="raw_response" type="object">
+  Raw response from the SuprSend API
+</ResponseField>
+
+## Handling Failed Records
+
+You can iterate through failed records to handle errors:
+
+```python
+response = bulk_ins.trigger()
+
+if response.failure > 0:
+    print(f"Failed workflows: {response.failure}")
+    for failed_record in response.failed_records:
+        print(f"Error: {failed_record['error']}")
+        print(f"Code: {failed_record['code']}")
+        print(f"Workflow: {failed_record['record']}")
+        # Implement retry logic or logging
+```
+
+## Complete Example
+
+Here's a complete example with error handling:
+
+```python
+from suprsend import Suprsend, WorkflowTriggerRequest
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+# Sample user data
+users = [
+    {"id": "user_1", "name": "John", "email": "john@example.com"},
+    {"id": "user_2", "name": "Jane", "email": "jane@example.com"},
+    {"id": "user_3", "name": "Bob", "email": "bob@example.com"},
+    # ... more users
+]
+
+# Create bulk instance
+bulk_ins = supr_client.workflows.bulk_trigger_instance()
+
+# Create and append workflows for each user
+for user in users:
+    wf = WorkflowTriggerRequest(
+        body={
+            "workflow": "promotional-campaign",
+            "recipients": [
+                {
+                    "distinct_id": user["id"],
+                    "$email": [user["email"]]
+                }
+            ],
+            "data": {
+                "user_name": user["name"],
+                "campaign_name": "Summer Sale 2024"
+            }
+        },
+        idempotency_key=f"promo_campaign_{user['id']}"
+    )
+    bulk_ins.append(wf)
+
+# Trigger all workflows
+response = bulk_ins.trigger()
+
+# Handle response
+print(f"Total: {response.total}")
+print(f"Success: {response.success}")
+print(f"Failure: {response.failure}")
+
+if response.failure > 0:
+    print("\nFailed workflows:")
+    for idx, failed_record in enumerate(response.failed_records, 1):
+        print(f"{idx}. Error: {failed_record['error']}")
+```
+
+## Use Cases
+
+### Batch User Notifications
+
+```python
+# Send welcome emails to new users
+bulk_ins = supr_client.workflows.bulk_trigger_instance()
+
+for user_id in new_user_ids:
+    wf = WorkflowTriggerRequest(body={
+        "workflow": "welcome-series",
+        "recipients": [{"distinct_id": user_id}],
+        "data": {"signup_date": "2024-01-15"}
+    })
+    bulk_ins.append(wf)
+
+response = bulk_ins.trigger()
+```
+
+### Multi-Channel Campaign
+
+```python
+# Send campaign across multiple channels
+bulk_ins = supr_client.workflows.bulk_trigger_instance()
+
+for recipient in campaign_recipients:
+    wf = WorkflowTriggerRequest(
+        body={
+            "workflow": "product-launch",
+            "recipients": [{
+                "distinct_id": recipient["id"],
+                "$channels": ["email", "sms", "whatsapp"]
+            }],
+            "data": {
+                "product_name": "New Feature X",
+                "launch_date": "2024-02-01"
+            }
+        },
+        tenant_id="marketing"
+    )
+    bulk_ins.append(wf)
+
+response = bulk_ins.trigger()
+```
+
+### Different Workflows in Bulk
+
+```python
+# Trigger different workflows based on user segments
+bulk_ins = supr_client.workflows.bulk_trigger_instance()
+
+for user in users:
+    workflow_name = "premium-offer" if user["is_premium"] else "standard-offer"
+    
+    wf = WorkflowTriggerRequest(body={
+        "workflow": workflow_name,
+        "recipients": [{"distinct_id": user["id"]}],
+        "data": {"offer_code": user["offer_code"]}
+    })
+    bulk_ins.append(wf)
+
+response = bulk_ins.trigger()
+```
+
+## Limitations
+
+<Warning>
+**Attachment Restrictions**
+
+By default, attachments are not allowed in bulk workflow operations. If you add attachments using `add_attachment()`, they will be automatically removed when the bulk request is processed.
+</Warning>
+
+<Info>
+**No Record Limit**
+
+There is no limit on the number of workflows you can add to a bulk instance. The SDK handles chunking automatically.
+</Info>
+
+## Best Practices
+
+<Check>
+- Use idempotency keys to prevent duplicate processing
+- Handle failed records gracefully with retry logic
+- Group similar workflows together for better performance
+- Monitor the `failed_records` array for debugging
+- Use tenant IDs for multi-tenant applications
+- Validate workflow data before adding to bulk instance
+</Check>
+
+## Performance Tips
+
+1. **Batch Size**: While there's no hard limit, consider your use case when batching workflows
+2. **Error Handling**: Implement proper error handling for failed records
+3. **Idempotency**: Use idempotency keys to safely retry failed operations
+4. **Monitoring**: Track success/failure ratios to identify issues early
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Triggering Workflows" icon="play" href="/workflows/triggering-workflows">
+    Learn the basics of triggering workflows
+  </Card>
+  <Card title="Workflow Data" icon="database" href="/workflows/workflow-data">
+    Understand workflow data structure
+  </Card>
+</CardGroup>

@@ -1,0 +1,263 @@
+---
+title: Error Handling
+description: Learn how to handle exceptions and errors in the SuprSend Python SDK
+---
+
+## Exception Types
+
+The SuprSend Python SDK provides several exception types to help you handle errors effectively.
+
+### Base Exception
+
+#### `SuprsendError`
+
+The base class for all SuprSend exceptions.
+
+**Attributes:**
+- `message` (str): The error message
+- `status_code` (int): HTTP status code (default: 500)
+
+**Example:**
+```python
+try:
+    # Your SuprSend operation
+    pass
+except SuprsendError as e:
+    print(f"Error: {e.message}")
+    print(f"Status Code: {e.status_code}")
+```
+
+### API Exceptions
+
+#### `SuprsendAPIException`
+
+Raised when an API request fails. Inherits from `SuprsendError`.
+
+**Attributes:**
+- `message` (str): Error message extracted from API response
+- `status_code` (int): HTTP status code from the response
+- `response` (Response): The raw HTTP response object
+
+**Response Structure:**
+The exception automatically extracts error messages from JSON responses:
+- Looks for `message` or `detail` fields in JSON responses
+- Falls back to plain text for non-JSON responses
+
+**Example:**
+```python
+from suprsend import SuprsendAPIException
+
+try:
+    supr_client.workflows.trigger(workflow_body)
+except SuprsendAPIException as e:
+    print(f"API Error: {e.message}")
+    print(f"Status Code: {e.status_code}")
+    # Access raw response if needed
+    print(f"Response Headers: {e.response.headers}")
+```
+
+### Configuration Exceptions
+
+#### `SuprsendConfigError`
+
+Raised when there are configuration issues with the SDK.
+
+**Example:**
+```python
+from suprsend import SuprsendConfigError
+
+try:
+    supr_client = Suprsend(workspace_key, workspace_secret)
+except SuprsendConfigError as e:
+    print(f"Configuration Error: {e.message}")
+```
+
+### Validation Exceptions
+
+#### `InputValueError`
+
+Raised when an input value is invalid. Inherits from Python's built-in `ValueError`.
+
+**Example:**
+```python
+from suprsend import InputValueError
+
+try:
+    workflow.add_attachment(invalid_url)
+except InputValueError as e:
+    print(f"Invalid Input: {e}")
+```
+
+#### `SuprsendValidationError`
+
+Raised when data validation fails.
+
+**Attributes:**
+- `message` (str): Validation error description
+- `status_code` (int): Always 400
+- `error_type` (str): "SuprsendValidationError"
+
+**Example:**
+```python
+from suprsend import SuprsendValidationError
+
+try:
+    workflow_body = {...}  # Invalid workflow data
+    supr_client.workflows.trigger(workflow_body)
+except SuprsendValidationError as e:
+    print(f"Validation Error: {e.message}")
+    print(f"Error Type: {e.error_type}")
+```
+
+### Schema Exceptions
+
+#### `SuprsendMissingSchema`
+
+Raised when a required JSON schema is missing.
+
+**Attributes:**
+- `status_code` (int): Always 500
+- `error_type` (str): "SuprsendMissingSchema"
+- `message` (str): "Missing JSON schema"
+
+#### `SuprsendInvalidSchema`
+
+Raised when a JSON schema is invalid.
+
+**Attributes:**
+- `status_code` (int): Always 500
+- `error_type` (str): "SuprsendInvalidSchema"
+- `message` (str): "Invalid JSON schema"
+
+## Error Handling Patterns
+
+### Basic Error Handling
+
+```python
+from suprsend import Suprsend, SuprsendError
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+try:
+    response = supr_client.workflows.trigger(workflow_body)
+    print("Success:", response)
+except SuprsendError as e:
+    print(f"Error [{e.status_code}]: {e.message}")
+```
+
+### Specific Exception Handling
+
+```python
+from suprsend import (
+    SuprsendAPIException,
+    SuprsendValidationError,
+    InputValueError,
+    SuprsendConfigError
+)
+
+try:
+    response = supr_client.workflows.trigger(workflow_body)
+except SuprsendValidationError as e:
+    # Handle validation errors
+    print(f"Validation failed: {e.message}")
+    # Fix the data and retry
+except SuprsendAPIException as e:
+    # Handle API errors
+    if e.status_code == 429:
+        print("Rate limited, retrying later...")
+    elif e.status_code >= 500:
+        print("Server error, please retry")
+    else:
+        print(f"API error: {e.message}")
+except InputValueError as e:
+    # Handle input errors
+    print(f"Invalid input: {e}")
+except SuprsendConfigError as e:
+    # Handle configuration errors
+    print(f"Configuration error: {e.message}")
+```
+
+### Bulk API Error Handling
+
+```python
+from suprsend import BulkWorkflowsFactory
+
+bulk_ins = BulkWorkflowsFactory()
+
+# Add multiple workflows
+for workflow_data in workflow_list:
+    try:
+        workflow = supr_client.workflows.trigger(workflow_data)
+        bulk_ins.append(workflow)
+    except Exception as e:
+        print(f"Skipping workflow due to error: {e}")
+        continue
+
+# Trigger bulk
+try:
+    response = bulk_ins.trigger()
+    print(f"Success: {response.success_count} workflows triggered")
+    print(f"Failed: {response.failed_count} workflows failed")
+    
+    # Check individual failures
+    for failed in response.failed:
+        print(f"Failed workflow: {failed}")
+except SuprsendAPIException as e:
+    print(f"Bulk API error: {e.message}")
+```
+
+### Retry Logic
+
+```python
+import time
+from suprsend import SuprsendAPIException
+
+def trigger_with_retry(supr_client, workflow_body, max_retries=3):
+    for attempt in range(max_retries):
+        try:
+            response = supr_client.workflows.trigger(workflow_body)
+            return response
+        except SuprsendAPIException as e:
+            if e.status_code == 429 or e.status_code >= 500:
+                if attempt < max_retries - 1:
+                    wait_time = 2 ** attempt  # Exponential backoff
+                    print(f"Retry {attempt + 1}/{max_retries} after {wait_time}s")
+                    time.sleep(wait_time)
+                else:
+                    raise
+            else:
+                # Don't retry for client errors (4xx except 429)
+                raise
+
+# Usage
+try:
+    response = trigger_with_retry(supr_client, workflow_body)
+    print("Success:", response)
+except SuprsendAPIException as e:
+    print(f"Failed after retries: {e.message}")
+```
+
+## Response Structure
+
+All error exceptions include:
+
+- **String representation**: Formatted as `[code: {status_code}] {message}`
+- **Attributes**: Direct access to `message` and `status_code`
+- **Raw response**: Available in `SuprsendAPIException` via the `response` attribute
+
+**Example:**
+```python
+try:
+    response = supr_client.workflows.trigger(workflow_body)
+except SuprsendAPIException as e:
+    # String representation
+    print(str(e))  # Output: [code: 400] Invalid workflow data
+    
+    # Attribute access
+    print(e.message)  # Output: Invalid workflow data
+    print(e.status_code)  # Output: 400
+    
+    # Raw response
+    print(e.response.headers)
+    print(e.response.text)
+```

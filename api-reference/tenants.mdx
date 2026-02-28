@@ -1,0 +1,169 @@
+---
+title: "TenantsApi"
+description: "Manage tenants in your SuprSend workspace"
+---
+
+The `TenantsApi` class provides methods to manage tenants in multi-tenant applications. Access it via `supr_client.tenants`.
+
+## Methods
+
+### list
+
+Retrieve a list of all tenants in your workspace.
+
+```python
+supr_client.tenants.list(limit=20, offset=0)
+```
+
+**Parameters**
+
+<ParamField path="limit" type="int" default="20">
+  Number of tenants to retrieve. Must be between 1 and 1000.
+</ParamField>
+
+<ParamField path="offset" type="int" default="0">
+  Number of tenants to skip. Must be greater than or equal to 0.
+</ParamField>
+
+**Returns**
+
+A JSON object containing the list of tenants.
+
+**Example**
+
+```python
+from suprsend import Suprsend
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+# Get first 20 tenants
+response = supr_client.tenants.list()
+
+# Get next 20 tenants
+response = supr_client.tenants.list(limit=20, offset=20)
+```
+
+---
+
+### get
+
+Retrieve details of a specific tenant by ID.
+
+```python
+supr_client.tenants.get(tenant_id)
+```
+
+**Parameters**
+
+<ParamField path="tenant_id" type="str" required>
+  The unique identifier of the tenant.
+</ParamField>
+
+**Returns**
+
+A JSON object containing the tenant details.
+
+**Example**
+
+```python
+from suprsend import Suprsend
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+response = supr_client.tenants.get("tenant_123")
+```
+
+**Raises**
+
+- `SuprsendValidationError`: If `tenant_id` is not a valid string or is empty.
+- `SuprsendAPIException`: If the API request fails.
+
+---
+
+### upsert
+
+Create a new tenant or update an existing one.
+
+```python
+supr_client.tenants.upsert(tenant_id, tenant_payload)
+```
+
+**Parameters**
+
+<ParamField path="tenant_id" type="str" required>
+  The unique identifier of the tenant.
+</ParamField>
+
+<ParamField path="tenant_payload" type="Dict" required>
+  A dictionary containing tenant properties to create or update.
+</ParamField>
+
+**Returns**
+
+A JSON object containing the upserted tenant details.
+
+**Example**
+
+```python
+from suprsend import Suprsend
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+tenant_data = {
+    "name": "Acme Corp",
+    "brand_id": "brand_123",
+    "settings": {
+        "timezone": "America/New_York"
+    }
+}
+
+response = supr_client.tenants.upsert("tenant_123", tenant_data)
+```
+
+**Raises**
+
+- `SuprsendValidationError`: If `tenant_id` is not a valid string or is empty.
+- `SuprsendAPIException`: If the API request fails.
+
+---
+
+### delete
+
+Delete a tenant by ID.
+
+```python
+supr_client.tenants.delete(tenant_id)
+```
+
+**Parameters**
+
+<ParamField path="tenant_id" type="str" required>
+  The unique identifier of the tenant to delete.
+</ParamField>
+
+**Returns**
+
+A dictionary with the deletion status:
+
+```python
+{
+    "success": True,
+    "status_code": 200
+}
+```
+
+**Example**
+
+```python
+from suprsend import Suprsend
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+response = supr_client.tenants.delete("tenant_123")
+print(response)  # {"success": True, "status_code": 200}
+```
+
+**Raises**
+
+- `SuprsendValidationError`: If `tenant_id` is not a valid string or is empty.
+- `SuprsendAPIException`: If the API request fails.

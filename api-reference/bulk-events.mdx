@@ -1,0 +1,381 @@
+---
+title: Bulk events
+description: Track multiple events efficiently in a single API call
+icon: layer-group
+---
+
+The bulk events API allows you to track multiple events in a single request, improving performance and reducing API calls.
+
+## BulkEventsFactory
+
+Access bulk events functionality through `supr_client.bulk_events`:
+
+```python
+from suprsend import Suprsend
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+bulk_events_factory = supr_client.bulk_events
+```
+
+### new_instance()
+
+Create a new bulk events instance.
+
+```python
+bulk_ins = supr_client.bulk_events.new_instance()
+```
+
+**Returns:** `BulkEvents` instance
+
+## BulkEvents
+
+The `BulkEvents` class manages bulk event operations.
+
+### append()
+
+Add one or more events to the bulk instance.
+
+```python
+from suprsend import Event
+
+# Add events one by one
+event1 = Event("user123", "product_viewed", {"product_id": "SKU-001"})
+bulk_ins.append(event1)
+
+event2 = Event("user456", "product_viewed", {"product_id": "SKU-002"})
+bulk_ins.append(event2)
+
+# Or add multiple events at once
+events = [
+    Event("user789", "product_viewed", {"product_id": "SKU-003"}),
+    Event("user012", "product_viewed", {"product_id": "SKU-004"})
+]
+bulk_ins.append(*events)
+```
+
+**Parameters:**
+
+<ParamField path="*events" type="Event" required>
+  One or more Event instances to add to the bulk operation
+</ParamField>
+
+### trigger()
+
+Send all appended events to SuprSend.
+
+```python
+response = bulk_ins.trigger()
+```
+
+**Returns:** `BulkResponse` object with details about success and failures
+
+## BulkResponse
+
+The response object contains detailed information about the bulk operation.
+
+### Attributes
+
+<ResponseField name="status" type="string">
+  Overall status: `"success"`, `"partial"`, or `"fail"`
+</ResponseField>
+
+<ResponseField name="status_code" type="integer">
+  HTTP status code
+</ResponseField>
+
+<ResponseField name="total" type="integer">
+  Total number of events processed
+</ResponseField>
+
+<ResponseField name="success" type="integer">
+  Number of events successfully tracked
+</ResponseField>
+
+<ResponseField name="failure" type="integer">
+  Number of events that failed
+</ResponseField>
+
+<ResponseField name="failed_records" type="list">
+  List of failed events with error details. Each item contains:
+  - `record`: The event that failed
+  - `error`: Error message
+  - `code`: HTTP error code
+</ResponseField>
+
+## Automatic chunking
+
+The SDK automatically divides events into chunks based on:
+
+- **Maximum events per chunk:** 100 events
+- **Maximum chunk size:** 100 KB
+
+Each chunk is sent as a separate API request.
+
+<Info>
+You don't need to manage chunking manually - the SDK handles it automatically.
+</Info>
+
+## Complete example
+
+```python
+from suprsend import Suprsend, Event
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+# Create bulk instance
+bulk_ins = supr_client.bulk_events.new_instance()
+
+# Prepare events
+events = [
+    Event(
+        distinct_id="user123",
+        event_name="product_viewed",
+        properties={"product_id": "SKU-001", "category": "electronics"}
+    ),
+    Event(
+        distinct_id="user456",
+        event_name="product_purchased",
+        properties={"product_id": "SKU-002", "amount": 99.99}
+    ),
+    Event(
+        distinct_id="user789",
+        event_name="cart_abandoned",
+        properties={"cart_value": 149.99, "items_count": 3}
+    )
+]
+
+# Add events to bulk instance
+bulk_ins.append(*events)
+
+# Trigger bulk operation
+response = bulk_ins.trigger()
+
+# Check results
+print(f"Total: {response.total}")
+print(f"Success: {response.success}")
+print(f"Failure: {response.failure}")
+
+if response.failed_records:
+    print("Failed events:")
+    for failed in response.failed_records:
+        print(f"  Error: {failed['error']}")
+        print(f"  Event: {failed['record']}")
+```
+
+## Bulk import from database
+
+```python
+from suprsend import Suprsend, Event
+import time
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+def import_events_from_db(query_result):
+    """Import events from database query result"""
+    bulk_ins = supr_client.bulk_events.new_instance()
+    
+    for row in query_result:
+        event = Event(
+            distinct_id=row['user_id'],
+            event_name=row['event_name'],
+            properties={
+                'timestamp': row['created_at'],
+                'source': 'database_import',
+                **row['properties']
+            },
+            idempotency_key=f"import-{row['id']}"
+        )
+        bulk_ins.append(event)
+    
+    response = bulk_ins.trigger()
+    return response
+
+# Usage
+events_data = fetch_events_from_database()
+response = import_events_from_db(events_data)
+
+print(f"Imported {response.success} out of {response.total} events")
+```
+
+## Batch processing
+
+```python
+from suprsend import Suprsend, Event
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+def process_events_in_batches(all_events, batch_size=1000):
+    """Process large number of events in batches"""
+    results = []
+    
+    for i in range(0, len(all_events), batch_size):
+        batch = all_events[i:i + batch_size]
+        
+        bulk_ins = supr_client.bulk_events.new_instance()
+        
+        for event_data in batch:
+            event = Event(
+                distinct_id=event_data['user_id'],
+                event_name=event_data['event_name'],
+                properties=event_data['properties']
+            )
+            bulk_ins.append(event)
+        
+        response = bulk_ins.trigger()
+        results.append(response)
+        
+        print(f"Batch {i//batch_size + 1}: {response.success}/{response.total} successful")
+    
+    return results
+
+# Usage
+large_event_list = generate_events(10000)  # 10,000 events
+results = process_events_in_batches(large_event_list)
+
+# Aggregate results
+total_success = sum(r.success for r in results)
+total_failure = sum(r.failure for r in results)
+print(f"Overall: {total_success} successful, {total_failure} failed")
+```
+
+## Error handling
+
+```python
+from suprsend import Suprsend, Event, InputValueError
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+bulk_ins = supr_client.bulk_events.new_instance()
+
+try:
+    # Add events
+    for i in range(100):
+        event = Event(
+            distinct_id=f"user{i}",
+            event_name="batch_event",
+            properties={"index": i}
+        )
+        bulk_ins.append(event)
+    
+    # Trigger
+    response = bulk_ins.trigger()
+    
+    # Handle partial failures
+    if response.status == "partial":
+        print(f"Partial success: {response.success} succeeded, {response.failure} failed")
+        
+        # Retry failed events
+        retry_ins = supr_client.bulk_events.new_instance()
+        for failed in response.failed_records:
+            # Extract original event data and retry
+            event = Event(
+                distinct_id=failed['record']['distinct_id'],
+                event_name=failed['record']['event'],
+                properties=failed['record']['properties']
+            )
+            retry_ins.append(event)
+        
+        retry_response = retry_ins.trigger()
+        print(f"Retry result: {retry_response.success}/{retry_response.total}")
+
+except InputValueError as e:
+    print(f"Validation error: {e}")
+except Exception as e:
+    print(f"Unexpected error: {e}")
+```
+
+## Limitations
+
+<Warning>
+Attachments are **not supported** in bulk events. The SDK automatically removes any `$attachments` from events in bulk operations.
+</Warning>
+
+- Maximum events per chunk: **100**
+- Maximum chunk size: **100 KB**
+- No limit on total number of events you can append
+- Attachments are automatically removed from events
+
+## Performance tips
+
+<CardGroup cols={2}>
+  <Card title="Batch wisely" icon="layer-group">
+    Group 100-1000 events per bulk operation for optimal performance
+  </Card>
+  <Card title="Avoid attachments" icon="paperclip">
+    Use single event API if you need to include attachments
+  </Card>
+  <Card title="Monitor failures" icon="chart-line">
+    Check `failed_records` and implement retry logic for failed events
+  </Card>
+  <Card title="Use idempotency" icon="shield">
+    Include idempotency keys to safely retry failed batches
+  </Card>
+</CardGroup>
+
+## Response examples
+
+### Full success
+
+```python
+{
+    "status": "success",
+    "status_code": 200,
+    "total": 100,
+    "success": 100,
+    "failure": 0,
+    "failed_records": []
+}
+```
+
+### Partial success
+
+```python
+{
+    "status": "partial",
+    "status_code": 200,
+    "total": 100,
+    "success": 95,
+    "failure": 5,
+    "failed_records": [
+        {
+            "record": {"event": "invalid_event", "distinct_id": "user123"},
+            "error": "Event name starting with $ is reserved",
+            "code": 400
+        },
+        # ... 4 more failed records
+    ]
+}
+```
+
+### Complete failure
+
+```python
+{
+    "status": "fail",
+    "status_code": 500,
+    "total": 100,
+    "success": 0,
+    "failure": 100,
+    "failed_records": [
+        {
+            "record": {...},
+            "error": "Internal server error",
+            "code": 500
+        },
+        # ... 99 more failed records
+    ]
+}
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Event class" icon="chart-line" href="/api-reference/event">
+    Learn about the Event class
+  </Card>
+  <Card title="Track events" icon="play" href="/events/tracking-events">
+    Guide to tracking events
+  </Card>
+  <Card title="Event properties" icon="list" href="/events/event-properties">
+    Learn about event properties
+  </Card>
+</CardGroup>

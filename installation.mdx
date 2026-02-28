@@ -1,0 +1,280 @@
+---
+title: "Installation"
+description: "Install and set up the SuprSend Python SDK in your project"
+---
+
+## Prerequisites
+
+Before installing the SDK, ensure you have:
+
+<Steps>
+  <Step title="Python 3.9 or higher">
+    The SDK requires Python 3.9 or later. Check your Python version:
+    
+    ```bash
+    python --version
+    ```
+  </Step>
+  
+  <Step title="SuprSend Account">
+    Sign up for a free account at [SuprSend](https://app.suprsend.com) to get your workspace credentials.
+  </Step>
+  
+  <Step title="Workspace Credentials">
+    You'll need your **Workspace Key** and **Workspace Secret** from the SuprSend dashboard.
+    
+    <Note>
+      Keep your workspace secret secure and never commit it to version control.
+    </Note>
+  </Step>
+</Steps>
+
+## Basic Installation
+
+Install the SDK using pip:
+
+```bash
+pip install suprsend-py-sdk
+```
+
+This installs the core SDK with the following dependencies:
+
+- `jsonschema` - For request validation
+- `requests` - For HTTP communication
+
+<Check>
+  The SDK is now installed and ready to use!
+</Check>
+
+## Installation with Enhanced MIME Detection
+
+When adding file attachments to notifications, the SDK needs to detect the file's MIME type (e.g., `application/pdf`, `image/png`). By default, Python's built-in `mimetypes` module is used, which guesses based on file extensions.
+
+For more accurate detection based on actual file content, install with the `magic` extra:
+
+```bash
+pip install suprsend-py-sdk[magic]
+```
+
+### System Library Requirement
+
+The `python-magic` package requires the `libmagic` system library:
+
+<CodeGroup>
+
+```bash Debian/Ubuntu
+sudo apt install libmagic1
+```
+
+```bash macOS
+brew install libmagic
+```
+
+```bash Fedora/RHEL
+sudo yum install file-libs
+```
+
+```bash Alpine Linux
+apk add libmagic
+```
+
+</CodeGroup>
+
+<Tip>
+  Install the `magic` extra if you plan to add attachments and want accurate MIME type detection for files without extensions or with incorrect extensions.
+</Tip>
+
+## Verify Installation
+
+Verify the SDK is installed correctly:
+
+```python
+import suprsend
+
+print(f"SuprSend SDK version: {suprsend.__version__}")
+```
+
+You should see the SDK version printed without any import errors.
+
+## Virtual Environment (Recommended)
+
+It's recommended to install the SDK in a virtual environment:
+
+<CodeGroup>
+
+```bash venv
+# Create virtual environment
+python -m venv venv
+
+# Activate (Linux/macOS)
+source venv/bin/activate
+
+# Activate (Windows)
+venv\Scripts\activate
+
+# Install SDK
+pip install suprsend-py-sdk
+```
+
+```bash Poetry
+# Initialize project
+poetry init
+
+# Add SDK
+poetry add suprsend-py-sdk
+
+# With magic extra
+poetry add suprsend-py-sdk[magic]
+```
+
+```bash Pipenv
+# Install SDK
+pipenv install suprsend-py-sdk
+
+# With magic extra
+pipenv install suprsend-py-sdk[magic]
+```
+
+</CodeGroup>
+
+## Configuration
+
+After installation, you'll need to configure the SDK with your workspace credentials.
+
+### Basic Configuration
+
+Create a client instance with your credentials:
+
+```python
+from suprsend import Suprsend
+
+supr_client = Suprsend(
+    workspace_key="your_workspace_key",
+    workspace_secret="your_workspace_secret"
+)
+```
+
+### Environment Variables (Recommended)
+
+Store your credentials as environment variables:
+
+```python
+import os
+from suprsend import Suprsend
+
+supr_client = Suprsend(
+    workspace_key=os.environ.get("SUPRSEND_WORKSPACE_KEY"),
+    workspace_secret=os.environ.get("SUPRSEND_WORKSPACE_SECRET")
+)
+```
+
+<Warning>
+  Never hardcode your workspace secret in your source code. Always use environment variables or a secure secret management solution.
+</Warning>
+
+### Advanced Configuration
+
+The SDK supports additional configuration options:
+
+```python
+from suprsend import Suprsend
+
+supr_client = Suprsend(
+    workspace_key="your_workspace_key",
+    workspace_secret="your_workspace_secret",
+    base_url="https://hub.suprsend.com/",  # Custom base URL (optional)
+    debug=True  # Enable debug logging (optional)
+)
+```
+
+<AccordionGroup>
+  <Accordion title="base_url" icon="link">
+    Custom API endpoint URL. Defaults to `https://hub.suprsend.com/`. Only change this if you're using a dedicated instance.
+  </Accordion>
+  
+  <Accordion title="debug" icon="bug">
+    Enable debug logging to see detailed HTTP requests and responses. Set to `True` for development, `False` for production (default).
+  </Accordion>
+</AccordionGroup>
+
+## Requirements File
+
+Add the SDK to your `requirements.txt`:
+
+```txt requirements.txt
+suprsend-py-sdk>=0.1.0
+```
+
+Or with the magic extra:
+
+```txt requirements.txt
+suprsend-py-sdk[magic]>=0.1.0
+```
+
+## Upgrading
+
+To upgrade to the latest version:
+
+```bash
+pip install --upgrade suprsend-py-sdk
+```
+
+## Supported Python Versions
+
+The SDK is tested and officially supports:
+
+<CardGroup cols={3}>
+  <Card title="Python 3.9" icon="check" />
+  <Card title="Python 3.10" icon="check" />
+  <Card title="Python 3.11" icon="check" />
+  <Card title="Python 3.12" icon="check" />
+  <Card title="Python 3.13" icon="check" />
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="ImportError: No module named 'suprsend'" icon="circle-exclamation">
+    Make sure you've installed the SDK:
+    ```bash
+    pip install suprsend-py-sdk
+    ```
+    
+    If using a virtual environment, ensure it's activated.
+  </Accordion>
+  
+  <Accordion title="python-magic installation fails" icon="circle-exclamation">
+    Install the system library first:
+    - **Debian/Ubuntu**: `sudo apt install libmagic1`
+    - **macOS**: `brew install libmagic`
+    
+    Then retry: `pip install suprsend-py-sdk[magic]`
+  </Accordion>
+  
+  <Accordion title="SSL Certificate Errors" icon="circle-exclamation">
+    If you encounter SSL certificate verification errors, ensure your system's CA certificates are up to date:
+    
+    ```bash
+    pip install --upgrade certifi
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Quickstart Guide"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Follow the quickstart guide to send your first notification
+  </Card>
+  <Card
+    title="Core Concepts"
+    icon="book"
+    href="/core-concepts/workflows"
+  >
+    Learn about workflows, users, and events
+  </Card>
+</CardGroup>

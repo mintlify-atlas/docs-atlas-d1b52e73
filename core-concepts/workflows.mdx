@@ -1,0 +1,286 @@
+---
+title: Workflows
+description: Understanding workflows in SuprSend - the foundation of your notification system
+icon: "flow"
+---
+
+## What are Workflows?
+
+Workflows are the core building blocks of SuprSend's notification system. A workflow represents a pre-configured notification template that can be triggered to send notifications across multiple channels (email, SMS, push, etc.) to your users.
+
+<Tip>
+Think of workflows as reusable notification blueprints. You design them once in the SuprSend dashboard, then trigger them programmatically whenever needed.
+</Tip>
+
+## How Workflows Work
+
+When you trigger a workflow, SuprSend:
+
+1. Receives your trigger request with recipient information and dynamic data
+2. Processes the workflow logic and channel preferences
+3. Renders the notification templates with your data
+4. Delivers notifications through the appropriate channels
+5. Tracks delivery status and engagement metrics
+
+<Note>
+Workflow execution is **asynchronous**. When you trigger a workflow, you'll immediately receive an acceptance response, but the actual processing happens in the background.
+</Note>
+
+## Workflow Structure
+
+A workflow trigger request consists of three main components:
+
+### 1. Workflow Identifier
+
+The unique name of the workflow you want to trigger:
+
+```python
+{
+  "workflow": "purchase-made"  # The workflow slug from your dashboard
+}
+```
+
+### 2. Recipients
+
+One or more users who should receive the notification:
+
+```python
+{
+  "recipients": [
+    {
+      "distinct_id": "user-123",           # Required: unique user identifier
+      "$email": ["user@example.com"],      # Optional: email addresses
+      "$sms": ["+1234567890"],             # Optional: phone numbers
+      "$channels": ["email", "sms"]        # Optional: limit to specific channels
+    }
+  ]
+}
+```
+
+<Info>
+You can either pass channel details inline (as shown above) or set them once in the [user profile](/core-concepts/users) and only pass the `distinct_id`.
+</Info>
+
+### 3. Dynamic Data
+
+The data to personalize your notification templates:
+
+```python
+{
+  "data": {
+    "first_name": "John",
+    "order_id": "ORD-789",
+    "total_amount": "$99.99",
+    "items": [
+      {"name": "Product A", "price": "$49.99"},
+      {"name": "Product B", "price": "$50.00"}
+    ]
+  }
+}
+```
+
+## Triggering a Workflow
+
+### Basic Example
+
+```python
+from suprsend import Suprsend, WorkflowTriggerRequest
+
+# Initialize client
+supr_client = Suprsend("your_workspace_key", "your_workspace_secret")
+
+# Create workflow request
+wf = WorkflowTriggerRequest(
+    body={
+        "workflow": "purchase-made",
+        "recipients": [
+            {
+                "distinct_id": "user-123",
+                "$email": ["user@example.com"],
+                "$androidpush": [
+                    {
+                        "token": "fcm_token_here",
+                        "provider": "fcm"
+                    }
+                ]
+            }
+        ],
+        "data": {
+            "first_name": "John",
+            "spend_amount": "$99.99"
+        }
+    }
+)
+
+# Trigger the workflow
+response = supr_client.workflows.trigger(wf)
+print(response)
+```
+
+### Response Structure
+
+Successful response:
+```python
+{
+    "success": True,
+    "status": "success",
+    "status_code": 202,
+    "message": "Message received"
+}
+```
+
+Error response:
+```python
+{
+    "success": False,
+    "status": "fail",
+    "status_code": 400,  # or 500
+    "message": "Error description"
+}
+```
+
+## Advanced Features
+
+### Idempotency Key
+
+Prevent duplicate workflow triggers by using an idempotency key:
+
+```python
+wf = WorkflowTriggerRequest(
+    body={...},
+    idempotency_key="order-123-notification"  # Max 64 chars
+)
+```
+
+<Warning>
+SuprSend will skip processing requests with the same idempotency key for 24 hours after the first request.
+</Warning>
+
+### Multi-Tenant Support
+
+Trigger workflows on behalf of a specific tenant:
+
+```python
+wf = WorkflowTriggerRequest(
+    body={...},
+    tenant_id="tenant-abc"
+)
+```
+
+### Cancellation Key
+
+Set a cancellation key to be able to cancel the workflow later:
+
+```python
+wf = WorkflowTriggerRequest(
+    body={...},
+    cancellation_key="campaign-2024-jan"
+)
+```
+
+### Adding Attachments
+
+Attach files to workflows (useful for email notifications):
+
+```python
+wf = WorkflowTriggerRequest(body={...})
+wf.add_attachment("/path/to/invoice.pdf")
+wf.add_attachment("/path/to/receipt.pdf", file_name="Receipt.pdf")
+
+response = supr_client.workflows.trigger(wf)
+```
+
+<Info>
+Attachments are base64-encoded and included in the request. See source code at `/home/daytona/workspace/source/src/suprsend/attachment.py` for implementation details.
+</Info>
+
+## Bulk Workflow Triggers
+
+For sending multiple workflows efficiently, use the bulk API:
+
+```python
+from suprsend import WorkflowTriggerRequest
+
+# Create bulk instance
+bulk_ins = supr_client.workflows.bulk_trigger_instance()
+
+# Create multiple workflow requests
+wf1 = WorkflowTriggerRequest(body={...})
+wf2 = WorkflowTriggerRequest(body={...})
+wf3 = WorkflowTriggerRequest(body={...})
+
+# Append workflows
+bulk_ins.append(wf1, wf2, wf3)
+# Or append individually
+# bulk_ins.append(wf1)
+# bulk_ins.append(wf2)
+
+# Trigger all workflows
+response = bulk_ins.trigger()
+print(response)
+```
+
+<Note>
+- The SDK automatically chunks requests based on size limits (max 800KB per request)
+- Each chunk is sent as a separate API call
+- Maximum 100 workflows per bulk API call
+</Note>
+
+## Size Limitations
+
+<Warning>
+A single workflow body must not exceed **800KB** (819,200 bytes). If exceeded, the SDK will raise a `ValueError`.
+</Warning>
+
+The SDK calculates apparent size considering:
+- Workflow body JSON size
+- Runtime keys added by the platform (~200 bytes)
+- Attachment sizes (if using base64 encoding)
+
+See implementation: `/home/daytona/workspace/source/src/suprsend/utils.py:16`
+
+## Channel Selection
+
+Control which channels are used for a specific workflow trigger:
+
+```python
+{
+  "recipients": [
+    {
+      "distinct_id": "user-123",
+      "$channels": ["email"],  # Only send via email for this request
+      "$email": ["user@example.com"]
+    }
+  ]
+}
+```
+
+If `$channels` is not specified, SuprSend uses the channel preferences configured in the workflow template.
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Set User Profiles" icon="user">
+    Store channel details in user profiles instead of passing them with each workflow trigger
+  </Card>
+  <Card title="Use Idempotency Keys" icon="shield">
+    Always use idempotency keys for critical notifications to prevent duplicates
+  </Card>
+  <Card title="Keep Data Clean" icon="broom">
+    Structure your data object to match your template variables exactly
+  </Card>
+  <Card title="Handle Responses" icon="check">
+    Always check the response status and implement proper error handling
+  </Card>
+</CardGroup>
+
+## Related Concepts
+
+- [Users](/core-concepts/users) - Learn about user profiles and channel management
+- [Channels](/core-concepts/channels) - Understand different notification channels
+- [Events](/core-concepts/events) - Track user events to trigger automated workflows
+
+## API Reference
+
+- [Trigger Workflow](/api-reference/workflows/trigger) - Complete API documentation
+- [Bulk Workflows](/api-reference/workflows/bulk-trigger) - Bulk API documentation

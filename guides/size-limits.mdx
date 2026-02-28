@@ -1,0 +1,332 @@
+---
+title: Size Limits
+description: Understanding body size limits and apparent size calculations in the SuprSend Python SDK
+---
+
+## Overview
+
+The SuprSend SDK enforces size limits to ensure optimal performance and prevent request failures. Understanding these limits is crucial for working with bulk operations and attachments.
+
+## Body Size Limits
+
+### API Request Body Limit
+
+The maximum apparent size for any single API call is **800KB**.
+
+```python
+BODY_MAX_APPARENT_SIZE_IN_BYTES = 819200  # 800 * 1024 bytes
+```
+
+This limit applies to:
+- Individual workflow triggers
+- Bulk workflow API calls
+- Bulk event API calls
+- Other API requests with payloads
+
+**Important:** If your request exceeds this limit, the SDK will raise a validation error before making the API call.
+
+### Identity Event Size Limit
+
+For single identity events, the limit is **10KB**.
+
+```python
+IDENTITY_SINGLE_EVENT_MAX_APPARENT_SIZE_IN_BYTES = 10240  # 10 * 1024 bytes
+```
+
+## Apparent Size Calculations
+
+The "apparent size" is not just the raw size of your data. The SDK calculates it by considering:
+
+### 1. Base Payload Size
+
+The size of your workflow data, event data, or other payload in bytes (UTF-8 encoded).
+
+### 2. Runtime Keys Overhead
+
+The SDK adds metadata and runtime keys to each workflow, which adds approximately **200 bytes** per workflow.
+
+```python
+WORKFLOW_RUNTIME_KEYS_POTENTIAL_SIZE_IN_BYTES = 200
+```
+
+**What this means:**
+```python
+# Your workflow data might be 5KB
+workflow_data = {...}  # 5120 bytes
+
+# But apparent size will be ~5.2KB
+apparent_size = 5120 + 200 = 5320 bytes
+```
+
+### 3. Attachment URL Overhead
+
+Each attachment URL in your workflow adds approximately **2100 bytes** to the apparent size.
+
+```python
+ATTACHMENT_URL_POTENTIAL_SIZE_IN_BYTES = 2100
+```
+
+**Calculation:**
+```python
+apparent_size = base_payload_size + 
+                runtime_keys_size + 
+                (num_attachments * attachment_url_size)
+```
+
+**Example:**
+```python
+# Workflow with 2 attachments
+base_size = 10000  # 10KB workflow data
+runtime_overhead = 200
+attachment_overhead = 2 * 2100  # 2 attachments
+
+apparent_size = 10000 + 200 + 4200 = 14400 bytes (~14KB)
+```
+
+## Bulk API Limits
+
+### Maximum Records Per Bulk Request
+
+#### Workflows
+Maximum **100 workflows** per bulk API call.
+
+```python
+MAX_WORKFLOWS_IN_BULK_API = 100
+```
+
+#### Events
+Maximum **100 events** per bulk API call.
+
+```python
+MAX_EVENTS_IN_BULK_API = 100
+```
+
+#### Identity Events
+Maximum **400 identity events** per bulk API call.
+
+```python
+MAX_IDENTITY_EVENTS_IN_BULK_API = 400
+```
+
+### Bulk Request Size Calculation
+
+For bulk requests, the apparent size is the sum of all individual records plus overhead:
+
+```python
+total_apparent_size = sum([
+    (record_size + runtime_overhead + attachment_overhead)
+    for record in bulk_records
+])
+```
+
+**The total must not exceed 800KB.**
+
+## Practical Examples
+
+### Example 1: Single Workflow
+
+```python
+from suprsend import Suprsend
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+workflow_body = {
+    "name": "welcome_notification",
+    "users": [{"distinct_id": "user123"}],
+    "data": {
+        "message": "Welcome to our platform!",
+        "user_name": "John Doe"
+    }
+}
+
+# Apparent size calculation:
+# - Base payload: ~150 bytes
+# - Runtime keys: 200 bytes
+# - Total: ~350 bytes (well under 800KB limit)
+
+response = supr_client.workflows.trigger(workflow_body)
+```
+
+### Example 2: Workflow with Attachments
+
+```python
+from suprsend import Suprsend, Workflow
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+workflow = supr_client.workflows.trigger({
+    "name": "invoice_notification",
+    "users": [{"distinct_id": "user123"}],
+    "data": {"invoice_id": "INV-001"}
+})
+
+# Add 3 attachments
+workflow.add_attachment("https://example.com/invoice.pdf")
+workflow.add_attachment("https://example.com/receipt.pdf")
+workflow.add_attachment("https://example.com/terms.pdf")
+
+# Apparent size calculation:
+# - Base payload: ~200 bytes
+# - Runtime keys: 200 bytes
+# - Attachments: 3 * 2100 = 6300 bytes
+# - Total: ~6700 bytes (~6.5KB)
+
+response = workflow.trigger()
+```
+
+### Example 3: Bulk Workflows
+
+```python
+from suprsend import Suprsend, BulkWorkflowsFactory
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+bulk_ins = BulkWorkflowsFactory()
+
+# Add 50 workflows, each ~5KB
+for i in range(50):
+    workflow = supr_client.workflows.trigger({
+        "name": "daily_digest",
+        "users": [{"distinct_id": f"user{i}"}],
+        "data": {"content": "..." * 1000}  # ~5KB of data
+    })
+    bulk_ins.append(workflow)
+
+# Apparent size calculation:
+# - Per workflow: 5000 (base) + 200 (runtime) = 5200 bytes
+# - Total: 50 * 5200 = 260000 bytes (~254KB)
+# - Within 800KB limit ✓
+
+response = bulk_ins.trigger()
+```
+
+### Example 4: Handling Size Limit Errors
+
+```python
+from suprsend import (
+    Suprsend, 
+    BulkWorkflowsFactory, 
+    SuprsendValidationError
+)
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+def trigger_workflows_in_batches(workflows, batch_size=50):
+    """Split workflows into batches to stay under size limit."""
+    
+    for i in range(0, len(workflows), batch_size):
+        batch = workflows[i:i + batch_size]
+        bulk_ins = BulkWorkflowsFactory()
+        
+        for workflow_data in batch:
+            workflow = supr_client.workflows.trigger(workflow_data)
+            bulk_ins.append(workflow)
+        
+        try:
+            response = bulk_ins.trigger()
+            print(f"Batch {i//batch_size + 1}: {response.success_count} succeeded")
+        except SuprsendValidationError as e:
+            print(f"Batch {i//batch_size + 1} exceeded size limit: {e.message}")
+            # Reduce batch size and retry
+            trigger_workflows_in_batches(batch, batch_size=batch_size//2)
+
+# Usage
+large_workflow_list = [...]  # Your workflows
+trigger_workflows_in_batches(large_workflow_list)
+```
+
+## Best Practices
+
+### 1. Monitor Payload Sizes
+
+```python
+import sys
+import json
+
+def estimate_apparent_size(workflow_data, num_attachments=0):
+    """Estimate apparent size of a workflow."""
+    base_size = len(json.dumps(workflow_data).encode('utf-8'))
+    runtime_size = 200
+    attachment_size = num_attachments * 2100
+    return base_size + runtime_size + attachment_size
+
+# Check before adding to bulk
+workflow_data = {...}
+size = estimate_apparent_size(workflow_data, num_attachments=2)
+print(f"Estimated size: {size} bytes ({size/1024:.2f} KB)")
+
+if size > 800 * 1024:
+    print("Warning: Workflow exceeds 800KB limit")
+```
+
+### 2. Batch Size Strategy
+
+```python
+def calculate_safe_batch_size(avg_workflow_size):
+    """Calculate safe batch size given average workflow size."""
+    max_size = 800 * 1024  # 800KB
+    runtime_overhead = 200
+    
+    effective_size = avg_workflow_size + runtime_overhead
+    safe_batch_size = int(max_size / effective_size * 0.9)  # 90% to be safe
+    
+    # Cap at API limit
+    return min(safe_batch_size, 100)
+
+# Usage
+avg_size = 5000  # 5KB per workflow
+batch_size = calculate_safe_batch_size(avg_size)
+print(f"Recommended batch size: {batch_size}")
+```
+
+### 3. Minimize Attachment Usage in Bulk
+
+```python
+# Attachments are allowed in bulk API
+ALLOW_ATTACHMENTS_IN_BULK_API = True
+
+# But they add significant overhead (2100 bytes each)
+# Consider:
+# - Limiting attachments in bulk operations
+# - Using attachment upload for large files
+# - Sending workflows with many attachments individually
+```
+
+### 4. Identity Event Batching
+
+```python
+from suprsend import SuprsendIdentityEvents
+
+# Identity events have stricter limits
+# - Single event: 10KB max
+# - Bulk: 400 events max per request
+# - Bulk total: Still 800KB max
+
+def batch_identity_events(events, max_per_batch=400):
+    for i in range(0, len(events), max_per_batch):
+        batch = events[i:i + max_per_batch]
+        # Process batch
+        yield batch
+```
+
+## Configuration Constants Reference
+
+```python
+# Maximum apparent size for API requests
+BODY_MAX_APPARENT_SIZE_IN_BYTES = 819200  # 800KB
+
+# Maximum single identity event size
+IDENTITY_SINGLE_EVENT_MAX_APPARENT_SIZE_IN_BYTES = 10240  # 10KB
+
+# Overhead calculations
+ATTACHMENT_URL_POTENTIAL_SIZE_IN_BYTES = 2100
+WORKFLOW_RUNTIME_KEYS_POTENTIAL_SIZE_IN_BYTES = 200
+
+# Bulk API limits
+MAX_WORKFLOWS_IN_BULK_API = 100
+MAX_EVENTS_IN_BULK_API = 100
+MAX_IDENTITY_EVENTS_IN_BULK_API = 400
+
+# Feature flags
+ALLOW_ATTACHMENTS_IN_BULK_API = True
+ATTACHMENT_UPLOAD_ENABLED = False
+```
