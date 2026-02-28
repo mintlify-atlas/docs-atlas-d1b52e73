@@ -1,0 +1,314 @@
+---
+title: ObjectEdit
+description: Build object edit operations programmatically
+icon: pencil
+---
+
+The `ObjectEdit` class provides a fluent interface for building object edit operations. It's similar to `UserEdit` but for custom objects.
+
+## Constructor
+
+Create an instance using `objects_api.get_edit_instance()`:
+
+```python
+from suprsend import Suprsend
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+object_edit = supr_client.objects.get_edit_instance(
+    object_type="project",
+    object_id="project-123"
+)
+```
+
+**Parameters:**
+
+<ParamField path="object_type" type="string" required>
+  Type of the object (e.g., "project", "team", "channel")
+</ParamField>
+
+<ParamField path="object_id" type="string" required>
+  Unique identifier for the object
+</ParamField>
+
+## Methods
+
+### set()
+
+Set a property value (overwrites existing value).
+
+```python
+# Set single property
+object_edit.set("status", "active")
+
+# Set multiple properties
+object_edit.set({
+    "status": "active",
+    "priority": "high",
+    "budget": 50000
+})
+```
+
+**Parameters:**
+
+<ParamField path="arg1" type="string | dict" required>
+  Property name (string) or dictionary of properties
+</ParamField>
+
+<ParamField path="arg2" type="any">
+  Property value (required if arg1 is string)
+</ParamField>
+
+### set_once()
+
+Set a property value only if it doesn't exist.
+
+```python
+# Set single property
+object_edit.set_once("created_at", "2024-01-15")
+
+# Set multiple properties
+object_edit.set_once({
+    "created_at": "2024-01-15",
+    "initial_status": "pending"
+})
+```
+
+**Parameters:**
+
+<ParamField path="arg1" type="string | dict" required>
+  Property name or dictionary of properties
+</ParamField>
+
+<ParamField path="arg2" type="any">
+  Property value (required if arg1 is string)
+</ParamField>
+
+### append()
+
+Append a value to a list property.
+
+```python
+# Append single value
+object_edit.append("tags", "urgent")
+
+# Append to multiple lists
+object_edit.append({
+    "tags": "urgent",
+    "labels": "priority"
+})
+```
+
+**Parameters:**
+
+<ParamField path="arg1" type="string | dict" required>
+  Property name or dictionary
+</ParamField>
+
+<ParamField path="arg2" type="any">
+  Value to append (required if arg1 is string)
+</ParamField>
+
+### remove()
+
+Remove a value from a list property.
+
+```python
+# Remove single value
+object_edit.remove("tags", "draft")
+
+# Remove from multiple lists
+object_edit.remove({
+    "tags": "draft",
+    "labels": "temporary"
+})
+```
+
+**Parameters:**
+
+<ParamField path="arg1" type="string | dict" required>
+  Property name or dictionary
+</ParamField>
+
+<ParamField path="arg2" type="any">
+  Value to remove (required if arg1 is string)
+</ParamField>
+
+### increment()
+
+Increment a numeric property.
+
+```python
+# Increment single property
+object_edit.increment("member_count", 5)
+
+# Increment multiple properties
+object_edit.increment({
+    "member_count": 5,
+    "completed_tasks": 1
+})
+```
+
+**Parameters:**
+
+<ParamField path="arg1" type="string | dict" required>
+  Property name or dictionary
+</ParamField>
+
+<ParamField path="arg2" type="number">
+  Amount to increment (required if arg1 is string)
+</ParamField>
+
+### unset()
+
+Remove properties from the object.
+
+```python
+# Unset single property
+object_edit.unset("temporary_field")
+
+# Unset multiple properties
+object_edit.unset(["field1", "field2", "field3"])
+```
+
+**Parameters:**
+
+<ParamField path="key" type="string | list" required>
+  Property name or list of property names to remove
+</ParamField>
+
+### get_payload()
+
+Get the operations payload.
+
+```python
+payload = object_edit.get_payload()
+print(payload)
+# {"operations": [{"$set": {"status": "active"}}]}
+```
+
+**Returns:** Dictionary with operations array
+
+### validate_body()
+
+Validate the edit operations.
+
+```python
+object_edit.validate_body()
+```
+
+This method logs any warnings or errors but doesn't raise exceptions.
+
+## Properties
+
+### errors
+
+List of validation errors.
+
+```python
+if object_edit.errors:
+    print("Errors:", object_edit.errors)
+```
+
+### warnings
+
+List of validation warnings.
+
+```python
+if object_edit.warnings:
+    print("Warnings:", object_edit.warnings)
+```
+
+## Complete Example
+
+```python
+from suprsend import Suprsend
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+# Create edit instance
+object_edit = supr_client.objects.get_edit_instance(
+    object_type="project",
+    object_id="project-mobile-app"
+)
+
+# Build operations
+object_edit.set("status", "in_progress")
+object_edit.set("last_updated", "2024-03-15")
+object_edit.append("tags", "priority")
+object_edit.increment("task_count", 1)
+object_edit.remove("labels", "draft")
+object_edit.unset("temp_notes")
+
+# Apply the edits
+response = supr_client.objects.edit(object_edit)
+
+if response:
+    print("Object updated successfully")
+
+# Check for errors
+if object_edit.errors:
+    print("Errors occurred:", object_edit.errors)
+```
+
+## Operation Types
+
+The ObjectEdit class supports these operation types:
+
+| Operation | Description | Example |
+|-----------|-------------|----------|
+| `$set` | Set property value | `set("name", "New Name")` |
+| `$set_once` | Set if not exists | `set_once("created_at", "2024-01-01")` |
+| `$append` | Add to list | `append("tags", "new-tag")` |
+| `$remove` | Remove from list | `remove("tags", "old-tag")` |
+| `$add` | Increment number | `increment("count", 1)` |
+| `$unset` | Delete property | `unset("field")` |
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Chain operations" icon="link">
+    Build multiple operations before calling edit() to reduce API calls
+  </Card>
+  <Card title="Check errors" icon="triangle-exclamation">
+    Always check the errors property after building operations
+  </Card>
+  <Card title="Validate first" icon="check">
+    Call validate_body() before edit() to catch issues early
+  </Card>
+  <Card title="Use appropriate ops" icon="wrench">
+    Use set() for simple updates, set_once() for initialization, append() for lists
+  </Card>
+</CardGroup>
+
+## Error Handling
+
+```python
+from suprsend import SuprsendAPIException
+
+object_edit = supr_client.objects.get_edit_instance("project", "proj-123")
+object_edit.set("status", "completed")
+
+try:
+    response = supr_client.objects.edit(object_edit)
+    print("Success:", response)
+except SuprsendAPIException as e:
+    print(f"API error: {e.status_code} - {e.message}")
+
+# Check validation errors
+if object_edit.errors:
+    print("Validation errors:", object_edit.errors)
+if object_edit.warnings:
+    print("Warnings:", object_edit.warnings)
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="ObjectsApi" icon="cube" href="/api-reference/objects-api">
+    Learn about ObjectsApi methods
+  </Card>
+  <Card title="UserEdit" icon="user" href="/api-reference/users-api">
+    Similar API for editing users
+  </Card>
+</CardGroup>

@@ -130,6 +130,13 @@
               "api-reference/subscriber-lists",
               "api-reference/subscriber-list-broadcast"
             ]
+          },
+          {
+            "group": "Objects",
+            "pages": [
+              "api-reference/objects-api",
+              "api-reference/object-edit"
+            ]
           }
         ]
       }

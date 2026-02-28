@@ -1,0 +1,444 @@
+---
+title: ObjectsApi
+description: Manage custom objects and subscriptions
+icon: cube
+---
+
+The `ObjectsApi` class provides methods for managing custom objects in SuprSend. Objects can represent anything in your domain (e.g., projects, teams, channels) and can have subscriptions from users or other objects.
+
+## Initialization
+
+Access the objects API through the `supr_client.objects` property:
+
+```python
+from suprsend import Suprsend
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+objects_api = supr_client.objects
+```
+
+## Object Operations
+
+### list()
+
+List all objects of a specific type.
+
+```python
+response = objects_api.list(
+    object_type="project",
+    options={"limit": 20, "offset": 0}
+)
+```
+
+**Parameters:**
+
+<ParamField path="object_type" type="string" required>
+  Type of objects to list (e.g., "project", "team", "channel")
+</ParamField>
+
+<ParamField path="options" type="dict">
+  Query options:
+  - `limit` (int): Number of objects to return
+  - `offset` (int): Number of objects to skip
+</ParamField>
+
+**Returns:** Dictionary with list of objects
+
+**Raises:**
+- `SuprsendValidationError`: If object_type is invalid
+- `SuprsendAPIException`: If the API request fails
+
+### get()
+
+Get details of a specific object.
+
+```python
+object_data = objects_api.get(
+    object_type="project",
+    object_id="project-123"
+)
+```
+
+**Parameters:**
+
+<ParamField path="object_type" type="string" required>
+  Type of the object
+</ParamField>
+
+<ParamField path="object_id" type="string" required>
+  Unique identifier for the object
+</ParamField>
+
+**Returns:** Dictionary with object details
+
+### upsert()
+
+Create or update an object.
+
+```python
+payload = {
+    "name": "Acme Project",
+    "status": "active",
+    "members": 15
+}
+
+response = objects_api.upsert(
+    object_type="project",
+    object_id="project-123",
+    payload=payload
+)
+```
+
+**Parameters:**
+
+<ParamField path="object_type" type="string" required>
+  Type of the object
+</ParamField>
+
+<ParamField path="object_id" type="string" required>
+  Unique identifier for the object
+</ParamField>
+
+<ParamField path="payload" type="dict">
+  Object data to create or update
+</ParamField>
+
+**Returns:** Dictionary with API response
+
+### edit()
+
+Edit an object with specific operations.
+
+```python
+# Using ObjectEdit instance
+object_edit = objects_api.get_edit_instance("project", "project-123")
+object_edit.set("status", "completed")
+object_edit.append("tags", "archived")
+
+response = objects_api.edit(object_edit)
+
+# Or pass edit payload directly
+edit_payload = {"operations": [{"$set": {"status": "completed"}}]}
+response = objects_api.edit(
+    object_type="project",
+    object_id="project-123",
+    edit_payload=edit_payload
+)
+```
+
+**Parameters:**
+
+<ParamField path="edit_ins_or_object_type" type="ObjectEdit | string" required>
+  Either an ObjectEdit instance or object_type string
+</ParamField>
+
+<ParamField path="object_id" type="string">
+  Required if first parameter is object_type
+</ParamField>
+
+<ParamField path="edit_payload" type="dict">
+  Edit operations payload
+</ParamField>
+
+**Returns:** Dictionary with API response
+
+### delete()
+
+Delete a specific object.
+
+```python
+response = objects_api.delete(
+    object_type="project",
+    object_id="project-123"
+)
+# Returns: {"success": True, "status_code": 200}
+```
+
+**Parameters:**
+
+<ParamField path="object_type" type="string" required>
+  Type of the object
+</ParamField>
+
+<ParamField path="object_id" type="string" required>
+  Unique identifier for the object to delete
+</ParamField>
+
+**Returns:** Dictionary with success status
+
+### bulk_delete()
+
+Delete multiple objects at once.
+
+```python
+payload = {
+    "object_ids": ["project-123", "project-456", "project-789"]
+}
+
+response = objects_api.bulk_delete(
+    object_type="project",
+    payload=payload
+)
+```
+
+**Parameters:**
+
+<ParamField path="object_type" type="string" required>
+  Type of the objects
+</ParamField>
+
+<ParamField path="payload" type="dict" required>
+  Dictionary containing `object_ids` list
+</ParamField>
+
+**Returns:** Dictionary with success status
+
+## Subscription Operations
+
+### get_subscriptions()
+
+Get all subscriptions for an object.
+
+```python
+response = objects_api.get_subscriptions(
+    object_type="project",
+    object_id="project-123",
+    options={"limit": 50, "offset": 0}
+)
+```
+
+**Parameters:**
+
+<ParamField path="object_type" type="string" required>
+  Type of the object
+</ParamField>
+
+<ParamField path="object_id" type="string" required>
+  Unique identifier for the object
+</ParamField>
+
+<ParamField path="options" type="dict">
+  Query options for pagination
+</ParamField>
+
+**Returns:** Dictionary with list of subscriptions
+
+### create_subscriptions()
+
+Add subscribers to an object.
+
+```python
+payload = {
+    "recipients": [
+        "user-123",  # User distinct_id
+        {"object_type": "team", "id": "team-456"}  # Another object
+    ],
+    "properties": {"role": "member"}
+}
+
+response = objects_api.create_subscriptions(
+    object_type="project",
+    object_id="project-123",
+    payload=payload
+)
+```
+
+**Parameters:**
+
+<ParamField path="object_type" type="string" required>
+  Type of the object
+</ParamField>
+
+<ParamField path="object_id" type="string" required>
+  Unique identifier for the object
+</ParamField>
+
+<ParamField path="payload" type="dict" required>
+  Subscription data:
+  - `recipients` (list): List of distinct_ids or object references
+  - `properties` (dict): Optional subscription properties
+</ParamField>
+
+**Returns:** Dictionary with API response
+
+### delete_subscriptions()
+
+Remove subscribers from an object.
+
+```python
+payload = {
+    "recipients": [
+        "user-123",
+        {"object_type": "team", "id": "team-456"}
+    ]
+}
+
+response = objects_api.delete_subscriptions(
+    object_type="project",
+    object_id="project-123",
+    payload=payload
+)
+```
+
+**Parameters:**
+
+<ParamField path="object_type" type="string" required>
+  Type of the object
+</ParamField>
+
+<ParamField path="object_id" type="string" required>
+  Unique identifier for the object
+</ParamField>
+
+<ParamField path="payload" type="dict" required>
+  Dictionary containing `recipients` list
+</ParamField>
+
+**Returns:** Dictionary with success status
+
+### get_objects_subscribed_to()
+
+Get list of objects that this object is subscribed to.
+
+```python
+response = objects_api.get_objects_subscribed_to(
+    object_type="project",
+    object_id="project-123",
+    options={"limit": 20}
+)
+```
+
+**Parameters:**
+
+<ParamField path="object_type" type="string" required>
+  Type of the object
+</ParamField>
+
+<ParamField path="object_id" type="string" required>
+  Unique identifier for the object
+</ParamField>
+
+<ParamField path="options" type="dict">
+  Query options for pagination
+</ParamField>
+
+**Returns:** Dictionary with list of subscribed objects
+
+### get_edit_instance()
+
+Create an ObjectEdit instance for editing operations.
+
+```python
+object_edit = objects_api.get_edit_instance(
+    object_type="project",
+    object_id="project-123"
+)
+
+# Use the instance to build edit operations
+object_edit.set("status", "active")
+object_edit.append("members", "user-456")
+
+# Apply the edits
+response = objects_api.edit(object_edit)
+```
+
+**Parameters:**
+
+<ParamField path="object_type" type="string" required>
+  Type of the object
+</ParamField>
+
+<ParamField path="object_id" type="string" required>
+  Unique identifier for the object
+</ParamField>
+
+**Returns:** `ObjectEdit` instance
+
+## Complete Example
+
+```python
+from suprsend import Suprsend
+
+supr_client = Suprsend("workspace_key", "workspace_secret")
+
+# Create a project object
+project_data = {
+    "name": "Mobile App Redesign",
+    "status": "in_progress",
+    "budget": 50000
+}
+
+supr_client.objects.upsert(
+    object_type="project",
+    object_id="project-mobile-redesign",
+    payload=project_data
+)
+
+# Subscribe team members to the project
+supr_client.objects.create_subscriptions(
+    object_type="project",
+    object_id="project-mobile-redesign",
+    payload={
+        "recipients": ["alice@example.com", "bob@example.com"],
+        "properties": {"role": "contributor"}
+    }
+)
+
+# Update project status
+object_edit = supr_client.objects.get_edit_instance(
+    "project",
+    "project-mobile-redesign"
+)
+object_edit.set("status", "completed")
+object_edit.set("completion_date", "2024-03-15")
+supr_client.objects.edit(object_edit)
+
+# Get all project subscriptions
+subscriptions = supr_client.objects.get_subscriptions(
+    object_type="project",
+    object_id="project-mobile-redesign"
+)
+
+print(f"Project has {len(subscriptions)} subscribers")
+```
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Team notifications" icon="users">
+    Send notifications to all members of a team or project
+  </Card>
+  <Card title="Channel subscriptions" icon="hashtag">
+    Manage subscriptions to channels or topics
+  </Card>
+  <Card title="Organization hierarchy" icon="sitemap">
+    Model organizational structures with objects and subscriptions
+  </Card>
+  <Card title="Custom domains" icon="cube">
+    Represent any domain-specific entity in your application
+  </Card>
+</CardGroup>
+
+## Error Handling
+
+```python
+from suprsend import SuprsendAPIException, SuprsendValidationError
+
+try:
+    response = supr_client.objects.get("project", "invalid-id")
+except SuprsendValidationError as e:
+    print(f"Validation error: {e}")
+except SuprsendAPIException as e:
+    print(f"API error: {e.status_code} - {e.message}")
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="ObjectEdit" icon="pencil" href="/api-reference/object-edit">
+    Learn about ObjectEdit class
+  </Card>
+  <Card title="User subscriptions" icon="bell" href="/api-reference/users-api">
+    Manage user subscriptions
+  </Card>
+</CardGroup>
